@@ -73,7 +73,13 @@ if ($BestFile) {
 
 Write-Host "==> 2. Stopping old wedding-website container..." -ForegroundColor Cyan
 Set-Location $DockerRoot
-docker rm -f wedding-website 2>$null | Out-Null
+$prevEAP = $ErrorActionPreference
+$ErrorActionPreference = "SilentlyContinue"
+$existingContainer = docker ps -a -q -f "name=wedding-website" 2>$null
+if ($existingContainer) {
+    docker rm -f wedding-website 2>$null | Out-Null
+}
+$ErrorActionPreference = $prevEAP
 
 Write-Host "==> 3. Downloading latest Wedding Website code from GitHub..." -ForegroundColor Cyan
 $TempDir = Join-Path $env:TEMP "wedding-website-update-$(Get-Random)"
