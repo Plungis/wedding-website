@@ -7,12 +7,14 @@ import {
   Calendar,
   MapPin,
   Settings,
-  Hash
+  Hash,
+  Crown
 } from 'lucide-react';
 import AboutTab from './components/AboutTab.jsx';
 import CeremonyTab from './components/CeremonyTab.jsx';
 import ReceptionTab from './components/ReceptionTab.jsx';
 import RsvpTab from './components/RsvpTab.jsx';
+import WeddingPartyTab from './components/WeddingPartyTab.jsx';
 import CmsPortal from './components/CmsPortal.jsx';
 import { renderDynamicIcon, GothicRoseArchOrnament } from './components/PageBlockRenderer.jsx';
 
@@ -77,6 +79,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [qrCodeFromUrl, setQrCodeFromUrl] = useState('');
   const [cmsOpen, setCmsOpen] = useState(false);
+  const [unlockedWeddingPartyGuest, setUnlockedWeddingPartyGuest] = useState(null);
 
   const loadContent = useCallback(async () => {
     try {
@@ -128,8 +131,21 @@ export default function App() {
     );
   }
 
-  const { siteSettings, aboutUs, ceremony, reception, sampleInvites } = siteData || {};
-  const visibleTabs = (siteSettings?.bigTabs || DEFAULT_BIG_TABS).filter((t) => t.visible !== false);
+  const { siteSettings, aboutUs, ceremony, reception, weddingPartyPage, sampleInvites } = siteData || {};
+  const baseTabs = (siteSettings?.bigTabs || DEFAULT_BIG_TABS).filter((t) => t.visible !== false);
+  const visibleTabs = unlockedWeddingPartyGuest || activeTab === 'wedding-party'
+    ? [
+        ...baseTabs,
+        {
+          id: 'wedding-party',
+          step: '05 • Inner Circle',
+          title: 'Wedding Party',
+          subtitle: 'Exclusive rehearsal, call times & VIP info',
+          icon: 'Star',
+          visible: true
+        }
+      ]
+    : baseTabs;
   const heroCrop = siteSettings?.heroBannerCrop || { x: 50, y: 50, zoom: 1 };
 
   return (
@@ -148,7 +164,20 @@ export default function App() {
           )}
         </div>
 
-        <div className="top-utility-actions">
+        <div className="top-utility-actions" style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+          <button
+            type="button"
+            className="btn-secondary"
+            style={{
+              padding: '0.36rem 0.85rem',
+              fontSize: '0.76rem',
+              borderColor: 'var(--border-gold)',
+              color: 'var(--accent-secondary)'
+            }}
+            onClick={() => handleSelectTab('wedding-party')}
+          >
+            <Crown size={13} /> {unlockedWeddingPartyGuest ? 'Wedding Party Portal (Unlocked ✓)' : 'Wedding Party Portal'}
+          </button>
           <button
             type="button"
             className="cms-launch-btn"
@@ -199,7 +228,7 @@ export default function App() {
         <div
           className="big-tabs-grid"
           style={{
-            gridTemplateColumns: `repeat(${Math.min(visibleTabs.length, 4)}, 1fr)`
+            gridTemplateColumns: `repeat(${Math.min(visibleTabs.length, 5)}, 1fr)`
           }}
         >
           {visibleTabs.map((tab) => {
@@ -264,6 +293,19 @@ export default function App() {
             rsvpDeadline={siteSettings?.rsvpDeadline}
             coupleShortNames={siteSettings?.shortNames}
             onRsvpSubmitted={loadContent}
+            onUnlockWeddingParty={(guest) => setUnlockedWeddingPartyGuest(guest)}
+            onSelectTab={handleSelectTab}
+          />
+        )}
+
+        {activeTab === 'wedding-party' && (
+          <WeddingPartyTab
+            weddingPartyPage={weddingPartyPage}
+            siteSettings={siteSettings}
+            unlockedGuest={unlockedWeddingPartyGuest}
+            onUnlockWeddingParty={(guest) => setUnlockedWeddingPartyGuest(guest)}
+            sampleInvites={sampleInvites}
+            onSelectTab={handleSelectTab}
           />
         )}
       </main>

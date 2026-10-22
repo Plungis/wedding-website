@@ -69,6 +69,8 @@ function normalizeGuestPlusOnes(guest) {
   const trimmedPlusOnes = finalPlusOnes.slice(0, targetPlusOnes);
   return {
     ...guest,
+    category: guest.category || 'Friend',
+    isWeddingParty: Boolean(guest.isWeddingParty),
     plusOnesAllowed: targetPlusOnes,
     members: [...namedMembers, ...trimmedPlusOnes]
   };
@@ -107,6 +109,11 @@ function loadDatabase() {
         ...structuredClone(defaultDatabase.reception),
         ...(parsed.reception || {}),
         blocks: parsed.reception?.blocks || structuredClone(defaultDatabase.reception.blocks)
+      },
+      weddingPartyPage: {
+        ...structuredClone(defaultDatabase.weddingPartyPage),
+        ...(parsed.weddingPartyPage || {}),
+        blocks: parsed.weddingPartyPage?.blocks || structuredClone(defaultDatabase.weddingPartyPage.blocks)
       }
     };
     if (!merged.siteSettings.theme || merged.siteSettings.theme === 'fall-goth') {
@@ -224,6 +231,8 @@ app.get('/api/content', (req, res) => {
   const sampleInvites = (db.guests || []).map((g) => ({
     code: g.code,
     householdName: g.householdName,
+    category: g.category || 'Friend',
+    isWeddingParty: Boolean(g.isWeddingParty),
     rsvpStatus: g.rsvpStatus,
     memberCount: (g.members || []).length,
     plusOnesAllowed: g.plusOnesAllowed || (g.members || []).filter((m) => m.isPlusOne).length
@@ -234,6 +243,7 @@ app.get('/api/content', (req, res) => {
     aboutUs: db.aboutUs,
     ceremony: db.ceremony,
     reception: db.reception,
+    weddingPartyPage: db.weddingPartyPage,
     sampleInvites
   });
 });
@@ -372,11 +382,11 @@ app.get('/api/admin/data', requireAdmin, (req, res) => {
   });
 });
 
-// 6. Update CMS Section (siteSettings, aboutUs, ceremony, reception)
+// 6. Update CMS Section (siteSettings, aboutUs, ceremony, reception, weddingPartyPage)
 app.put('/api/admin/section/:sectionName', requireAdmin, (req, res) => {
   const db = req.db;
   const { sectionName } = req.params;
-  const allowedSections = ['siteSettings', 'aboutUs', 'ceremony', 'reception'];
+  const allowedSections = ['siteSettings', 'aboutUs', 'ceremony', 'reception', 'weddingPartyPage'];
 
   if (!allowedSections.includes(sectionName)) {
     return res.status(400).json({ error: `Invalid section: ${sectionName}` });
@@ -396,12 +406,13 @@ app.put('/api/admin/section/:sectionName', requireAdmin, (req, res) => {
 // 6b. Publish Full CMS State (All Pages + Site Settings at once)
 app.put('/api/admin/publish-all', requireAdmin, (req, res) => {
   const db = req.db;
-  const { siteSettings, aboutUs, ceremony, reception } = req.body || {};
+  const { siteSettings, aboutUs, ceremony, reception, weddingPartyPage } = req.body || {};
 
   if (siteSettings) db.siteSettings = siteSettings;
   if (aboutUs) db.aboutUs = aboutUs;
   if (ceremony) db.ceremony = ceremony;
   if (reception) db.reception = reception;
+  if (weddingPartyPage) db.weddingPartyPage = weddingPartyPage;
 
   syncReceptionMenuOptions(db);
   saveDatabase(db, 'Published visual drag-and-drop changes across website sections', 'visual-builder');
@@ -451,6 +462,8 @@ app.post('/api/admin/guests', requireAdmin, (req, res) => {
     id: `guest-${Date.now()}`,
     code,
     householdName: (payload.householdName || 'New Guest Household').trim(),
+    category: payload.category || 'Friend',
+    isWeddingParty: Boolean(payload.isWeddingParty),
     plusOnesAllowed,
     email: (payload.email || '').trim(),
     phone: (payload.phone || '').trim(),

@@ -530,15 +530,157 @@ export const defaultDatabase = {
       }
     ]
   },
+  weddingPartyPage: {
+    kicker: "05 • Inner Circle & Bridal Party Portal",
+    headline: "Wedding Party Exclusive Dossier",
+    subheadline: "Private rehearsal dinner details, hair & makeup call times, portrait schedules, attire notes, and day-of contacts exclusively for our wedding party.",
+    divider: "✦ 🥀 ✦",
+    blocks: [
+      {
+        id: "block-wp-rehearsal",
+        type: "venue_showcase",
+        title: "Rehearsal Walk-Through & Candlelit Cellar Dinner",
+        visible: true,
+        settings: {
+          badge: "Friday Evening • Day Before the Wedding",
+          venueName: "The Wine Vaults at Sleepy Hollow Tavern",
+          ceremonyTime: "4:30 PM Ceremony Rehearsal • 6:30 PM Rehearsal Dinner",
+          doorsOpen: "Meet at Manor Cloister Archway at 4:15 PM sharp",
+          address: "74 Old Post Road, Tarrytown, NY 10591",
+          attire: "Cocktail Gothic / Dark Autumn Smart Casual",
+          attireNote: "We will walk through the ceremony processional at 4:30 PM at the Manor, then head 5 minutes down the road for wood-fired fare, local vintages, and toasts.",
+          parking: "Complimentary private shuttle from Castle Hotel departs at 3:55 PM.",
+          accessibility: "Private cellar dining room reserved exclusively for the Wedding Party & Immediate Family.",
+          mapUrl: "https://maps.google.com/?q=Tarrytown+NY",
+          venueImageUrl: "https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?auto=format&fit=crop&w=1200&q=80",
+          venueImageCrop: { x: 50, y: 50, zoom: 1 },
+          imagePosition: "left",
+          highlights: [
+            { label: "Rehearsal Call Time", value: "4:15 PM at Manor" },
+            { label: "Rehearsal Dinner", value: "6:30 PM at Wine Vaults" },
+            { label: "Who Is Invited", value: "Wedding Party + Dates & Immediate Family" },
+            { label: "Toasts & Roasts", value: "Open Mic After Dinner" }
+          ]
+        }
+      },
+      {
+        id: "block-wp-schedule",
+        type: "schedule_list",
+        kicker: "Wedding Day Call Sheet",
+        title: "Behind-the-Scenes Wedding Party Timeline",
+        subtitle: "Please arrive on time to the suites—breakfast, espresso, and champagne will be waiting!",
+        visible: true,
+        items: [
+          {
+            id: "wps-1",
+            time: "9:30 AM",
+            title: "Bridal Suite Opens • Hair, Makeup & Mimosa Breakfast",
+            description: "North Tower Conservatory Suite (Room 402). Please arrive with clean, dry hair and a button-down or robe."
+          },
+          {
+            id: "wps-2",
+            time: "11:30 AM",
+            title: "Groom's Parlor Opens • Espresso, Whiskey & Suit Steaming",
+            description: "The Library Lounge (Ground Floor). Barber touch-ups, boutonniere pinning, and lunch."
+          },
+          {
+            id: "wps-3",
+            time: "2:15 PM",
+            title: "All Wedding Party Fully Dressed for Portraits",
+            description: "Meet in the Stone Courtyard with bouquets and boutonnieres for Wedding Party & Immediate Family portraits."
+          },
+          {
+            id: "wps-4",
+            time: "4:15 PM",
+            title: "Wedding Party Tucked Away & Lineup Refreshments",
+            description: "Guests begin arriving at 4:30 PM. We will relax in the Cloister Parlor for final touch-ups before the 5:00 PM processional."
+          },
+          {
+            id: "wps-5",
+            time: "6:30 PM",
+            title: "Grand Entrance into the Glasshouse Conservatory",
+            description: "Line up by pairs with our coordinator for the reception entrance song!"
+          }
+        ]
+      },
+      {
+        id: "block-wp-details",
+        type: "feature_grid",
+        kicker: "Essentials & Prep",
+        title: "Attire, Florals & Day-Of Logistics",
+        subtitle: "Everything you need to know before packing your weekend bags.",
+        visible: true,
+        settings: {
+          columns: 3
+        },
+        items: [
+          {
+            id: "wpd-1",
+            icon: "Sparkles",
+            kicker: "Attire & Steaming",
+            title: "Velvet, Black Tie & Footwear",
+            description: "Two professional garment steamers will be in both suites. Bring comfortable flats or loafers for dancing after portraits!"
+          },
+          {
+            id: "wpd-2",
+            icon: "Heart",
+            kicker: "Bouquets & Boutonnieres",
+            title: "Delivered to Suites at 1:30 PM",
+            description: "Our florist will deliver all dark Baccara rose bouquets and magnetic boutonnieres directly to the getting-ready suites."
+          },
+          {
+            id: "wpd-3",
+            icon: "Car",
+            kicker: "Personal Belongings",
+            title: "Locked Suite Storage",
+            description: "Both getting-ready suites remain locked and reserved for us all night, so your bags and change of shoes stay safe until 11:30 PM."
+          }
+        ]
+      },
+      {
+        id: "block-wp-contacts",
+        type: "order_cards",
+        kicker: "Who to Text",
+        title: "Key Day-Of Contacts & Suite Numbers",
+        subtitle: "Save these numbers in your phone for wedding weekend.",
+        visible: true,
+        settings: {
+          columns: 3
+        },
+        items: [
+          {
+            id: "wpc-1",
+            badge: "Lead Coordinator",
+            title: "Genevieve Thorne (Day-Of Planner)",
+            description: "(914) 555-0199 • Text for any timing, shuttle, attire emergency, or vendor questions."
+          },
+          {
+            id: "wpc-2",
+            badge: "Maid of Honor",
+            title: "Clara Vance • Suite 402",
+            description: "(917) 555-0144 • Point of contact for Bridal Suite, hair/makeup schedule, and bustle help."
+          },
+          {
+            id: "wpc-3",
+            badge: "Best Man",
+            title: "Marcus Sterling • Library Parlor",
+            description: "(646) 555-0181 • Point of contact for Groom's Parlor, rings, and rehearsal transportation."
+          }
+        ]
+      }
+    ]
+  },
   guests: [
     {
       id: "guest-1",
       code: "ROSE-4829",
       householdName: "The Anderson Family",
+      category: "Immediate Family",
+      isWeddingParty: true,
       email: "claire.anderson@example.com",
       phone: "(415) 555-0182",
       tableNumber: "Table 3 • Black Baccara",
-      personalNote: "Claire & David — We are so thrilled to celebrate with you both under the October moon! Thank you for being part of our story from day one.",
+      personalNote: "Claire & David — We are so thrilled to celebrate with you both under the October moon! Your QR code also unlocks the Wedding Party Portal.",
       rsvpStatus: "responded",
       respondedAt: "2026-10-18T19:20:00.000Z",
       dietaryNotes: "No shellfish for David, please.",
@@ -565,11 +707,13 @@ export const defaultDatabase = {
       id: "guest-2",
       code: "OLIVE-7712",
       householdName: "Dr. Maya Lin & Plus One",
+      category: "Friend",
+      isWeddingParty: true,
       plusOnesAllowed: 1,
       email: "maya.lin@example.com",
       phone: "(206) 555-0149",
       tableNumber: "Table 5 • Nightshade",
-      personalNote: "Maya! From rainy bookstore coffee runs to an October manor wedding—we reserved a +1 spot for you, so let us know who you'll be bringing!",
+      personalNote: "Maya! From rainy bookstore coffee runs to standing by our side—we reserved a +1 spot for you and unlocked your Wedding Party schedule!",
       rsvpStatus: "pending",
       respondedAt: null,
       dietaryNotes: "",
@@ -598,6 +742,8 @@ export const defaultDatabase = {
       id: "guest-3",
       code: "CHAMP-1045",
       householdName: "The Bennett Household",
+      category: "Family",
+      isWeddingParty: false,
       email: "liam.bennett@example.com",
       phone: "(310) 555-0123",
       tableNumber: "Table 2 • Crimson Oak",
@@ -635,6 +781,8 @@ export const defaultDatabase = {
       id: "guest-4",
       code: "VELVET-9310",
       householdName: "Jordan & Taylor Brooks",
+      category: "Friend",
+      isWeddingParty: false,
       email: "jordan.brooks@example.com",
       phone: "(650) 555-0191",
       tableNumber: "Table 4 • Ironwood",
@@ -665,6 +813,8 @@ export const defaultDatabase = {
       id: "guest-5",
       code: "GARDEN-5581",
       householdName: "Arthur & Beatrice Montgomery",
+      category: "Immediate Family",
+      isWeddingParty: false,
       email: "amontgomery@example.com",
       phone: "(212) 555-0174",
       tableNumber: "Table 1 • Manor Hearth",

@@ -15,7 +15,8 @@ import {
   RefreshCw,
   AlertCircle,
   Eye,
-  UserPlus
+  UserPlus,
+  Crown
 } from 'lucide-react';
 
 function extractCodeFromRawText(rawText = '') {
@@ -42,7 +43,9 @@ export default function RsvpTab({
   menuOptions = [],
   rsvpDeadline,
   coupleShortNames,
-  onRsvpSubmitted
+  onRsvpSubmitted,
+  onUnlockWeddingParty,
+  onSelectTab
 }) {
   const [inputCode, setInputCode] = useState(initialCode || '');
   const [loading, setLoading] = useState(false);
@@ -132,6 +135,9 @@ export default function RsvpTab({
           ...data.guest,
           members: normalizedMembers
         });
+        if (data.guest?.isWeddingParty && onUnlockWeddingParty) {
+          onUnlockWeddingParty(data.guest);
+        }
         if (data.menuOptions?.length) {
           setAvailableMeals(data.menuOptions);
         }
@@ -532,10 +538,23 @@ export default function RsvpTab({
                       CODE: {inv.code}
                     </div>
                     <div style={{ fontSize: '0.73rem', opacity: 0.8, marginTop: '0.2rem' }}>
-                      {inv.memberCount} {inv.memberCount === 1 ? 'Seat' : 'Seats'}
-                      {inv.plusOnesAllowed > 0 ? ` (Includes +${inv.plusOnesAllowed})` : ''} •{' '}
-                      {inv.rsvpStatus === 'responded' ? 'Responded ✓' : 'Awaiting RSVP'}
+                      {inv.category || 'Friend'} • {inv.memberCount} {inv.memberCount === 1 ? 'Seat' : 'Seats'}
+                      {inv.plusOnesAllowed > 0 ? ` (+${inv.plusOnesAllowed})` : ''}
                     </div>
+                    {inv.isWeddingParty && (
+                      <div
+                        style={{
+                          marginTop: '0.3rem',
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                          color: 'var(--accent-secondary)',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.08em'
+                        }}
+                      >
+                        👑 Wedding Party Access
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -612,6 +631,24 @@ export default function RsvpTab({
                 <span className="role-badge" style={{ marginBottom: 0 }}>
                   Invitation Code: {guestData.code}
                 </span>
+                {guestData.category && (
+                  <span className="role-badge" style={{ marginBottom: 0, background: 'var(--bg-secondary)', color: 'var(--accent-secondary)' }}>
+                    {guestData.category}
+                  </span>
+                )}
+                {guestData.isWeddingParty && (
+                  <span
+                    className="role-badge"
+                    style={{
+                      marginBottom: 0,
+                      background: 'rgba(212, 168, 83, 0.2)',
+                      color: 'var(--accent-secondary)',
+                      border: '1px solid var(--border-gold)'
+                    }}
+                  >
+                    👑 Wedding Party Member
+                  </span>
+                )}
                 {guestData.tableNumber && (
                   <span className="role-badge" style={{ marginBottom: 0, background: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}>
                     {guestData.tableNumber}
@@ -649,6 +686,40 @@ export default function RsvpTab({
                   }}
                 >
                   “{guestData.personalNote}”
+                </div>
+              )}
+
+              {guestData.isWeddingParty && onSelectTab && (
+                <div
+                  style={{
+                    marginTop: '1rem',
+                    padding: '1rem 1.25rem',
+                    borderRadius: '14px',
+                    background: 'linear-gradient(135deg, rgba(158, 27, 50, 0.28), rgba(212, 168, 83, 0.14))',
+                    border: '1.5px solid var(--border-gold)',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: '0.85rem'
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 700, color: 'var(--accent-secondary)', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <Crown size={16} /> Exclusive Wedding Party Portal Unlocked!
+                    </div>
+                    <div style={{ fontSize: '0.83rem', color: 'var(--text-secondary)' }}>
+                      Your QR code includes access to our private rehearsal dinner details, hair & makeup call sheet, and day-of contacts.
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    style={{ padding: '0.55rem 1.1rem', fontSize: '0.84rem' }}
+                    onClick={() => onSelectTab('wedding-party')}
+                  >
+                    <Crown size={15} /> Open Wedding Party Page →
+                  </button>
                 </div>
               )}
             </div>

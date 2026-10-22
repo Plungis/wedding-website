@@ -34,8 +34,17 @@ import {
   ZoomIn,
   Scissors,
   Calendar,
-  UserPlus
+  UserPlus,
+  Crown
 } from 'lucide-react';
+
+const GUEST_CATEGORIES = [
+  'Friend',
+  'Family',
+  'Immediate Family',
+  'Extended Family',
+  'Work / Colleague'
+];
 
 function toDateTimeLocalValue(isoStr) {
   if (!isoStr) return '2027-10-23T17:00';
@@ -785,12 +794,15 @@ export default function CmsPortal({
   const [qrImages, setQrImages] = useState({});
   const [copiedCode, setCopiedCode] = useState('');
   const [guestFilter, setGuestFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showNewGuestModal, setShowNewGuestModal] = useState(false);
   const [editingGuest, setEditingGuest] = useState(null);
   const [newGuestForm, setNewGuestForm] = useState({
     householdName: '',
     code: '',
+    category: 'Friend',
+    isWeddingParty: false,
     email: '',
     tableNumber: '',
     personalNote: '',
@@ -806,7 +818,7 @@ export default function CmsPortal({
 
   useEffect(() => {
     if (!cmsDb) return;
-    if (['aboutUs', 'ceremony', 'reception'].includes(builderPage)) {
+    if (['aboutUs', 'ceremony', 'reception', 'weddingPartyPage'].includes(builderPage)) {
       const blocks = cmsDb[builderPage]?.blocks || [];
       if (blocks.length > 0 && !blocks.some((b) => b.id === selectedBlockId)) {
         setSelectedBlockId(blocks[0].id);
@@ -892,7 +904,8 @@ export default function CmsPortal({
           siteSettings: cmsDb.siteSettings,
           aboutUs: cmsDb.aboutUs,
           ceremony: cmsDb.ceremony,
-          reception: cmsDb.reception
+          reception: cmsDb.reception,
+          weddingPartyPage: cmsDb.weddingPartyPage
         })
       });
       const data = await res.json();
@@ -1032,6 +1045,8 @@ export default function CmsPortal({
         body: JSON.stringify({
           householdName: newGuestForm.householdName,
           code: newGuestForm.code,
+          category: newGuestForm.category || 'Friend',
+          isWeddingParty: Boolean(newGuestForm.isWeddingParty),
           email: newGuestForm.email,
           tableNumber: newGuestForm.tableNumber,
           personalNote: newGuestForm.personalNote,
@@ -1047,6 +1062,8 @@ export default function CmsPortal({
         setNewGuestForm({
           householdName: '',
           code: '',
+          category: 'Friend',
+          isWeddingParty: false,
           email: '',
           tableNumber: '',
           personalNote: '',
@@ -1064,7 +1081,7 @@ export default function CmsPortal({
     }
   }
 
-  async function handleQuickSetPlusOnes(guest, nextPlusOnesCount) {
+  async function handleQuickUpdateGuestMeta(guest, updates) {
     try {
       const res = await fetch(`/api/admin/guests/${guest.id}`, {
         method: 'PUT',
@@ -1074,20 +1091,16 @@ export default function CmsPortal({
         },
         body: JSON.stringify({
           ...guest,
-          plusOnesAllowed: Number(nextPlusOnesCount)
+          ...updates
         })
       });
       const data = await res.json();
       if (res.ok) {
         setCmsDb(data.db);
         setAnalytics(data.analytics);
-        setSavingStatus(
-          Number(nextPlusOnesCount) > 0
-            ? `✓ Enabled +${nextPlusOnesCount} guest option for ${guest.householdName}`
-            : `✓ Removed +1 option for ${guest.householdName}`
-        );
+        setSavingStatus(`✓ Updated ${guest.householdName}`);
         if (onContentUpdated) onContentUpdated();
-        setTimeout(() => setSavingStatus(''), 3000);
+        setTimeout(() => setSavingStatus(''), 2500);
       }
     } catch {
       // ignore
@@ -1163,9 +1176,12 @@ export default function CmsPortal({
       [
         'Household Name',
         'QR Code',
+        'Category',
+        'Wedding Party',
         'RSVP Status',
         'Table',
         'Guest Member Name',
+        'Is +1 Slot',
         'Attending',
         'Entree Choice',
         'Member Dietary',
@@ -1180,9 +1196,12 @@ export default function CmsPortal({
         rows.push([
           `"${(g.householdName || '').replace(/"/g, '""')}"`,
           g.code,
+          `"${(g.category || 'Friend').replace(/"/g, '""')}"`,
+          g.isWeddingParty ? 'Yes' : 'No',
           g.rsvpStatus,
           `"${(g.tableNumber || '').replace(/"/g, '""')}"`,
           `"${(m.name || '').replace(/"/g, '""')}"`,
+          m.isPlusOne ? 'Yes (+1)' : 'No',
           m.attending === true ? 'Yes' : m.attending === false ? 'No' : 'Pending',
           `"${(m.mealChoice || '').replace(/"/g, '""')}"`,
           `"${(m.dietary || '').replace(/"/g, '""')}"`,
@@ -1277,7 +1296,7 @@ export default function CmsPortal({
     );
   }
 
-  const isBlockPage = ['aboutUs', 'ceremony', 'reception'].includes(builderPage);
+  const isBlockPage = ['aboutUs', 'ceremony', 'reception', 'weddingPartyPage'].includes(builderPage);
   const currentPageObj = isBlockPage ? cmsDb?.[builderPage] : null;
   const currentBlocks = currentPageObj?.blocks || [];
   const selectedBlock = currentBlocks.find((b) => b.id === selectedBlockId) || null;
@@ -1285,12 +1304,17 @@ export default function CmsPortal({
   const filteredGuests = (cmsDb?.guests || []).filter((g) => {
     if (guestFilter === 'responded' && g.rsvpStatus !== 'responded') return false;
     if (guestFilter === 'pending' && g.rsvpStatus !== 'pending') return false;
+    if (categoryFilter === 'wedding-party' && !g.isWeddingParty) return false;
+    if (categoryFilter !== 'all' && categoryFilter !== 'wedding-party' && (g.category || 'Friend') !== categoryFilter) {
+      return false;
+    }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const matchHousehold = g.householdName?.toLowerCase().includes(q);
       const matchCode = g.code?.toLowerCase().includes(q);
+      const matchCategory = g.category?.toLowerCase().includes(q);
       const matchMember = (g.members || []).some((m) => m.name?.toLowerCase().includes(q));
-      return matchHousehold || matchCode || matchMember;
+      return matchHousehold || matchCode || matchCategory || matchMember;
     }
     return true;
   });
@@ -2155,6 +2179,7 @@ export default function CmsPortal({
                     { id: 'aboutUs', label: '01 • About Us Page', icon: Heart },
                     { id: 'ceremony', label: '02 • Ceremony Page', icon: Sparkles },
                     { id: 'reception', label: '03 • Reception & Menu Page', icon: Wine },
+                    { id: 'weddingPartyPage', label: '05 • Wedding Party VIP Page', icon: Crown },
                     { id: 'heroTabs', label: 'Hero Archway & Big Tabs Deck', icon: Layout }
                   ].map((pg) => {
                     const IconC = pg.icon;
@@ -3420,11 +3445,25 @@ export default function CmsPortal({
                   className="form-select"
                   value={guestFilter}
                   onChange={(e) => setGuestFilter(e.target.value)}
-                  style={{ width: '170px', padding: '0.55rem 0.85rem' }}
+                  style={{ width: '160px', padding: '0.55rem 0.85rem' }}
                 >
-                  <option value="all">All Households</option>
+                  <option value="all">All RSVP Status</option>
                   <option value="responded">Responded ✓</option>
                   <option value="pending">Pending RSVP</option>
+                </select>
+                <select
+                  className="form-select"
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  style={{ width: '195px', padding: '0.55rem 0.85rem' }}
+                >
+                  <option value="all">All Guest Categories</option>
+                  <option value="wedding-party">👑 Wedding Party Only</option>
+                  {GUEST_CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>
+                      Category: {cat}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -3471,6 +3510,50 @@ export default function CmsPortal({
                     />
                   </div>
 
+                  <div className="form-group">
+                    <label className="form-label">Guest Category *</label>
+                    <select
+                      className="form-select"
+                      value={newGuestForm.category || 'Friend'}
+                      onChange={(e) => setNewGuestForm({ ...newGuestForm, category: e.target.value })}
+                    >
+                      {GUEST_CATEGORIES.map((cat) => (
+                        <option key={cat} value={cat}>
+                          {cat}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Wedding Party Access</label>
+                    <label
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.6rem',
+                        padding: '0.62rem 0.85rem',
+                        borderRadius: '10px',
+                        background: newGuestForm.isWeddingParty ? 'rgba(212, 168, 83, 0.18)' : 'var(--bg-primary)',
+                        border: newGuestForm.isWeddingParty ? '1.5px solid var(--border-gold)' : '1px solid var(--border-color)',
+                        cursor: 'pointer',
+                        fontWeight: 700,
+                        fontSize: '0.84rem',
+                        color: newGuestForm.isWeddingParty ? 'var(--accent-secondary)' : 'var(--text-primary)'
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={Boolean(newGuestForm.isWeddingParty)}
+                        onChange={(e) => setNewGuestForm({ ...newGuestForm, isWeddingParty: e.target.checked })}
+                      />
+                      <Crown size={15} color="var(--accent-secondary)" />
+                      <span>Wedding Party (Unlocks VIP Page)</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="grid-2" style={{ gap: '1rem' }}>
                   <div className="form-group">
                     <label className="form-label">Unique QR Code (Leave blank to auto-generate)</label>
                     <input
@@ -3633,6 +3716,49 @@ export default function CmsPortal({
                       onChange={(e) => setEditingGuest({ ...editingGuest, householdName: e.target.value })}
                     />
                   </div>
+                  <div className="form-group">
+                    <label className="form-label">Guest Category</label>
+                    <select
+                      className="form-select"
+                      value={editingGuest.category || 'Friend'}
+                      onChange={(e) => setEditingGuest({ ...editingGuest, category: e.target.value })}
+                    >
+                      {GUEST_CATEGORIES.map((cat) => (
+                        <option key={cat} value={cat}>
+                          {cat}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Wedding Party Access</label>
+                    <label
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.6rem',
+                        padding: '0.62rem 0.85rem',
+                        borderRadius: '10px',
+                        background: editingGuest.isWeddingParty ? 'rgba(212, 168, 83, 0.18)' : 'var(--bg-primary)',
+                        border: editingGuest.isWeddingParty ? '1.5px solid var(--border-gold)' : '1px solid var(--border-color)',
+                        cursor: 'pointer',
+                        fontWeight: 700,
+                        fontSize: '0.84rem',
+                        color: editingGuest.isWeddingParty ? 'var(--accent-secondary)' : 'var(--text-primary)'
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={Boolean(editingGuest.isWeddingParty)}
+                        onChange={(e) => setEditingGuest({ ...editingGuest, isWeddingParty: e.target.checked })}
+                      />
+                      <Crown size={15} color="var(--accent-secondary)" />
+                      <span>Wedding Party Member</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="grid-2" style={{ gap: '1rem' }}>
                   <div className="form-group">
                     <label className="form-label">Unique QR Code</label>
                     <input
@@ -3907,6 +4033,66 @@ export default function CmsPortal({
                         </span>
                       )}
 
+                      {/* Quick Category Selector Directly on the Guest Card */}
+                      <div
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
+                          background: 'var(--bg-secondary)',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: '999px',
+                          padding: '0.15rem 0.6rem',
+                          fontSize: '0.74rem'
+                        }}
+                      >
+                        <span style={{ color: 'var(--text-muted)', fontWeight: 700 }}>Category:</span>
+                        <select
+                          value={guest.category || 'Friend'}
+                          onChange={(e) => handleQuickUpdateGuestMeta(guest, { category: e.target.value })}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: 'var(--accent-secondary)',
+                            fontWeight: 700,
+                            fontSize: '0.74rem',
+                            cursor: 'pointer',
+                            outline: 'none'
+                          }}
+                        >
+                          {GUEST_CATEGORIES.map((cat) => (
+                            <option key={cat} value={cat} style={{ background: '#120b10' }}>
+                              {cat}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Quick Wedding Party Checkbox Directly on the Guest Card */}
+                      <label
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
+                          background: guest.isWeddingParty ? 'rgba(212, 168, 83, 0.2)' : 'var(--bg-secondary)',
+                          border: guest.isWeddingParty ? '1px solid var(--border-gold)' : '1px solid var(--border-color)',
+                          borderRadius: '999px',
+                          padding: '0.15rem 0.65rem',
+                          fontSize: '0.74rem',
+                          fontWeight: 700,
+                          color: guest.isWeddingParty ? 'var(--accent-secondary)' : 'var(--text-secondary)',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={Boolean(guest.isWeddingParty)}
+                          onChange={(e) => handleQuickUpdateGuestMeta(guest, { isWeddingParty: e.target.checked })}
+                        />
+                        <Crown size={12} color="var(--accent-secondary)" />
+                        <span>Wedding Party</span>
+                      </label>
+
                       {/* Quick +1 Selector Directly on the Guest Card */}
                       <div
                         style={{
@@ -3928,7 +4114,7 @@ export default function CmsPortal({
                               ? guest.plusOnesAllowed
                               : (guest.members || []).filter((m) => m.isPlusOne).length
                           }
-                          onChange={(e) => handleQuickSetPlusOnes(guest, Number(e.target.value))}
+                          onChange={(e) => handleQuickUpdateGuestMeta(guest, { plusOnesAllowed: Number(e.target.value) })}
                           style={{
                             background: 'transparent',
                             border: 'none',
