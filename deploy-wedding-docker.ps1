@@ -80,7 +80,8 @@ $TempDir = Join-Path $env:TEMP "wedding-website-update-$(Get-Random)"
 New-Item -ItemType Directory -Path $TempDir -Force | Out-Null
 $ZipFile = Join-Path $TempDir "repo.zip"
 
-Invoke-WebRequest -Uri "$ZipUrl?t=$(Get-Date -Format 'yyyyMMddHHmmss')" -OutFile $ZipFile -UseBasicParsing
+$DownloadUrl = "https://codeload.github.com/Plungis/wedding-website/zip/refs/heads/main"
+Invoke-WebRequest -Uri $DownloadUrl -OutFile $ZipFile -UseBasicParsing
 Expand-Archive -Path $ZipFile -DestinationPath $TempDir -Force
 $ExtractedFolder = Get-ChildItem -Path $TempDir -Directory | Select-Object -First 1
 
