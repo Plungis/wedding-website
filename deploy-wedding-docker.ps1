@@ -61,8 +61,13 @@ foreach ($Cand in $CandidatePaths) {
 }
 
 if ($BestFile) {
-    Copy-Item -Path $BestFile -Destination $TargetDbFile -Force
-    Copy-Item -Path $BestFile -Destination (Join-Path $ExternalData "db.backup.json") -Force
+    if ((Resolve-Path $BestFile).Path -ne (Resolve-Path $TargetDbFile -ErrorAction SilentlyContinue).Path) {
+        Copy-Item -Path $BestFile -Destination $TargetDbFile -Force
+    }
+    $BackupTarget = Join-Path $ExternalData "db.backup.json"
+    if ((Resolve-Path $BestFile).Path -ne (Resolve-Path $BackupTarget -ErrorAction SilentlyContinue).Path) {
+        Copy-Item -Path $BestFile -Destination $BackupTarget -Force
+    }
     Write-Host "    ✅ Preserved/Recovered best database from: $BestFile" -ForegroundColor Green
 }
 
