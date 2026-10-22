@@ -815,10 +815,25 @@ export default function CmsPortal({
   });
 
   useEffect(() => {
-    if (isOpen && authenticated) {
+    if (isOpen && authenticated && !hasUnsavedChanges) {
       fetchAdminData();
     }
   }, [isOpen, authenticated]);
+
+  // Mirror every CMS state update to browser localStorage & auto-save to server after 850ms
+  useEffect(() => {
+    if (!cmsDb || !authenticated) return;
+    try {
+      window.localStorage.setItem('wedding_cms_local_backup_v1', JSON.stringify(cmsDb));
+    } catch {
+      // ignore storage quota errors
+    }
+    if (!hasUnsavedChanges) return;
+    const timer = setTimeout(() => {
+      publishAllChanges({ silentAutoSave: true });
+    }, 850);
+    return () => clearTimeout(timer);
+  }, [cmsDb, hasUnsavedChanges, authenticated]);
 
   useEffect(() => {
     if (!cmsDb) return;
@@ -857,6 +872,40 @@ export default function CmsPortal({
 
   if (!isOpen) return null;
 
+  async function maybeAutoRecoverFromLocalStorage(serverDb) {
+    try {
+      const rawLocal = window.localStorage.getItem('wedding_cms_local_backup_v1');
+      if (!rawLocal) return null;
+      const localDb = JSON.parse(rawLocal);
+      const serverIsDefault =
+        serverDb?.siteSettings?.coupleNames === 'Elena Vance & Julian Sterling' &&
+        (serverDb?.revisions || []).length <= 1;
+      const localIsCustomized =
+        localDb?.siteSettings?.coupleNames !== 'Elena Vance & Julian Sterling' ||
+        (localDb?.revisions || []).length > 1;
+      if (serverIsDefault && localIsCustomized) {
+        const res = await fetch('/api/admin/import-db', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-passcode': passcode
+          },
+          body: JSON.stringify({ db: localDb })
+        });
+        const restored = await res.json();
+        if (res.ok && restored.db) {
+          setSavingStatus('✓ Auto-restored your saved edits from browser backup!');
+          if (onContentUpdated) onContentUpdated();
+          setTimeout(() => setSavingStatus(''), 4000);
+          return restored;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  }
+
   async function handleLogin(e) {
     e.preventDefault();
     setAuthError('');
@@ -871,8 +920,10 @@ export default function CmsPortal({
         setAuthError(data.error || 'Invalid passcode');
       } else {
         setAuthenticated(true);
-        setCmsDb(data.db);
-        setAnalytics(data.analytics);
+        const recovered = await maybeAutoRecoverFromLocalStorage(data.db);
+        const activeData = recovered || data;
+        setCmsDb(activeData.db);
+        setAnalytics(activeData.analytics);
         setSelectedBlockId('__HERO_BANNER__');
       }
     } catch {
@@ -887,17 +938,20 @@ export default function CmsPortal({
       });
       const data = await res.json();
       if (res.ok) {
-        setCmsDb(data.db);
-        setAnalytics(data.analytics);
+        const recovered = await maybeAutoRecoverFromLocalStorage(data.db);
+        const activeData = recovered || data;
+        setCmsDb(activeData.db);
+        setAnalytics(activeData.analytics);
       }
     } catch {
       // ignore
     }
   }
 
-  async function publishAllChanges() {
+  async function publishAllChanges(options = {}) {
     if (!cmsDb) return;
-    setSavingStatus('Publishing changes...');
+    const silent = Boolean(options?.silentAutoSave);
+    setSavingStatus(silent ? 'Auto-saving to disk...' : 'Publishing changes...');
     try {
       const res = await fetch('/api/admin/publish-all', {
         method: 'PUT',
@@ -916,16 +970,18 @@ export default function CmsPortal({
       });
       const data = await res.json();
       if (res.ok) {
-        setCmsDb(data.db);
+        if (!silent) {
+          setCmsDb(data.db);
+        }
         setAnalytics(data.analytics);
-        applyThemeAndCustomColors(data.db.siteSettings);
+        applyThemeAndCustomColors(cmsDb.siteSettings);
         if (cmsDb.siteSettings?.adminPasscode) {
           setPasscode(cmsDb.siteSettings.adminPasscode);
         }
         setHasUnsavedChanges(false);
-        setSavingStatus('✓ All Changes Published Live!');
+        setSavingStatus(silent ? '✓ Auto-Saved to Disk' : '✓ All Changes Published Live!');
         if (onContentUpdated) onContentUpdated();
-        setTimeout(() => setSavingStatus(''), 3500);
+        setTimeout(() => setSavingStatus(''), 2800);
       } else {
         setSavingStatus(`Error: ${data.error}`);
       }
@@ -2013,21 +2069,26 @@ export default function CmsPortal({
             <button
               type="button"
               className="btn-primary"
-              onClick={publishAllChanges}
+              onClick={() => publishAllChanges({ silentAutoSave: false })}
               style={{
                 padding: '0.52rem 1.15rem',
                 fontSize: '0.84rem',
                 boxShadow: hasUnsavedChanges ? '0 0 18px rgba(212, 168, 83, 0.6)' : 'none'
               }}
             >
-              <Save size={15} /> {hasUnsavedChanges ? 'Publish Unsaved Changes *' : 'Publish All Changes Live'}
+              <Save size={15} /> {hasUnsavedChanges ? 'Save Now (Auto-Saving...)' : 'All Changes Saved ✓'}
             </button>
 
             <button
               type="button"
               className="btn-secondary"
               style={{ padding: '0.5rem 0.9rem', fontSize: '0.82rem' }}
-              onClick={onClose}
+              onClick={async () => {
+                if (hasUnsavedChanges) {
+                  await publishAllChanges({ silentAutoSave: false });
+                }
+                onClose();
+              }}
             >
               <X size={15} /> Exit Studio
             </button>
@@ -5881,34 +5942,90 @@ export default function CmsPortal({
         {studioMode === 'revisions' && cmsDb && (
           <div className="cms-scroll-body">
             <div className="surface-card">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                 <div>
-                  <h4 style={{ fontSize: '1.5rem' }}>Recent CMS Edits & Guest RSVP Activity</h4>
+                  <h4 style={{ fontSize: '1.5rem' }}>Recent CMS Edits, Backups & Guest RSVP Activity</h4>
                   <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
-                    All edits and guest RSVPs are stored in <code>C:\docker\wedding-website\data\db.json</code> and preserved across updates.
+                    All edits auto-save to <code>C:\docker\wedding-data\db.json</code> (outside the code folder) + your browser backup so updates never touch your data.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  className="btn-danger"
-                  onClick={async () => {
-                    if (!window.confirm('Reset all wedding website content, sections, and sample guests to factory defaults?')) return;
-                    const res = await fetch('/api/admin/reset', {
-                      method: 'POST',
-                      headers: { 'x-admin-passcode': passcode }
-                    });
-                    const data = await res.json();
-                    if (res.ok) {
-                      setCmsDb(data.db);
-                      setAnalytics(data.analytics);
-                      setHasUnsavedChanges(false);
-                      applyThemeAndCustomColors(data.db.siteSettings);
-                      if (onContentUpdated) onContentUpdated();
-                    }
-                  }}
-                >
-                  <RotateCcw size={15} /> Reset to Factory Defaults
-                </button>
+                <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => {
+                      const blob = new Blob([JSON.stringify(cmsDb, null, 2)], { type: 'application/json' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `wedding-website-backup-${new Date().toISOString().slice(0, 10)}.json`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                  >
+                    <Download size={15} /> Download Backup (.json)
+                  </button>
+
+                  <label className="btn-secondary" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Upload size={15} /> Restore Backup (.json)
+                    <input
+                      type="file"
+                      accept=".json,application/json"
+                      style={{ display: 'none' }}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        try {
+                          const text = await file.text();
+                          const parsed = JSON.parse(text);
+                          const res = await fetch('/api/admin/import-db', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              'x-admin-passcode': passcode
+                            },
+                            body: JSON.stringify({ db: parsed })
+                          });
+                          const data = await res.json();
+                          if (res.ok) {
+                            setCmsDb(data.db);
+                            setAnalytics(data.analytics);
+                            setHasUnsavedChanges(false);
+                            applyThemeAndCustomColors(data.db.siteSettings);
+                            setSavingStatus('✓ Backup file restored & saved to disk!');
+                            if (onContentUpdated) onContentUpdated();
+                            setTimeout(() => setSavingStatus(''), 4000);
+                          }
+                        } catch {
+                          alert('Invalid backup JSON file.');
+                        }
+                      }}
+                    />
+                  </label>
+
+                  <button
+                    type="button"
+                    className="btn-danger"
+                    onClick={async () => {
+                      if (!window.confirm('Reset all wedding website content, sections, and sample guests to factory defaults?')) return;
+                      window.localStorage.removeItem('wedding_cms_local_backup_v1');
+                      const res = await fetch('/api/admin/reset', {
+                        method: 'POST',
+                        headers: { 'x-admin-passcode': passcode }
+                      });
+                      const data = await res.json();
+                      if (res.ok) {
+                        setCmsDb(data.db);
+                        setAnalytics(data.analytics);
+                        setHasUnsavedChanges(false);
+                        applyThemeAndCustomColors(data.db.siteSettings);
+                        if (onContentUpdated) onContentUpdated();
+                      }
+                    }}
+                  >
+                    <RotateCcw size={15} /> Reset to Factory Defaults
+                  </button>
+                </div>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>

@@ -11,12 +11,14 @@ const __dirname = path.dirname(__filename);
 
 const DATA_DIR = path.join(__dirname, 'data');
 const DB_PATH = path.join(DATA_DIR, 'db.json');
+const DB_BACKUP_PATH = path.join(DATA_DIR, 'db.backup.json');
+const DB_TMP_PATH = path.join(DATA_DIR, 'db.json.tmp');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(cors());
-app.use(express.json({ limit: '25mb' }));
+app.use(express.json({ limit: '50mb' }));
 
 function syncReceptionMenuOptions(db) {
   if (db?.reception?.blocks) {
@@ -76,18 +78,32 @@ function normalizeGuestPlusOnes(guest) {
   };
 }
 
+function readValidJsonFile(filePath) {
+  try {
+    if (!fs.existsSync(filePath)) return null;
+    const raw = fs.readFileSync(filePath, 'utf-8');
+    if (!raw || !raw.trim()) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
 // Ensure data directory and database file exist
 function loadDatabase() {
   try {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
-    if (!fs.existsSync(DB_PATH)) {
+    let parsed =
+      readValidJsonFile(DB_PATH) ||
+      readValidJsonFile(DB_BACKUP_PATH) ||
+      readValidJsonFile(DB_TMP_PATH);
+
+    if (!parsed) {
       fs.writeFileSync(DB_PATH, JSON.stringify(defaultDatabase, null, 2), 'utf-8');
       return structuredClone(defaultDatabase);
     }
-    const raw = fs.readFileSync(DB_PATH, 'utf-8');
-    const parsed = JSON.parse(raw);
     const merged = {
       ...structuredClone(defaultDatabase),
       ...parsed,
@@ -154,9 +170,19 @@ function saveDatabase(db, revisionSummary = null, section = 'cms') {
       ...(db.revisions || []).slice(0, 49)
     ];
   }
-  const tempPath = `${DB_PATH}.tmp`;
-  fs.writeFileSync(tempPath, JSON.stringify(db, null, 2), 'utf-8');
-  fs.renameSync(tempPath, DB_PATH);
+  const serialized = JSON.stringify(db, null, 2);
+  try {
+    fs.writeFileSync(DB_TMP_PATH, serialized, 'utf-8');
+    fs.renameSync(DB_TMP_PATH, DB_PATH);
+  } catch {
+    // Fallback for Windows Docker volume bind mounts where renameSync over an existing file can throw EBUSY/EPERM
+    fs.writeFileSync(DB_PATH, serialized, 'utf-8');
+  }
+  try {
+    fs.writeFileSync(DB_BACKUP_PATH, serialized, 'utf-8');
+  } catch {
+    // ignore backup write error
+  }
 }
 
 function computeAnalytics(guests = [], menuOptions = []) {
@@ -557,6 +583,37 @@ app.post('/api/admin/reset', requireAdmin, (req, res) => {
   res.json({
     db: fresh,
     analytics: computeAnalytics(fresh.guests, fresh.reception?.menuOptions)
+  });
+});
+
+// 11. Import / Restore Full Database Backup (or Auto-Recover from Browser LocalStorage)
+app.post('/api/admin/import-db', requireAdmin, (req, res) => {
+  const incoming = req.body?.db;
+  if (!incoming || typeof incoming !== 'object') {
+    return res.status(400).json({ error: 'Invalid database backup payload.' });
+  }
+  const merged = {
+    ...structuredClone(defaultDatabase),
+    ...incoming,
+    siteSettings: {
+      ...structuredClone(defaultDatabase.siteSettings),
+      ...(incoming.siteSettings || {}),
+      underConstruction: {
+        ...structuredClone(defaultDatabase.siteSettings.underConstruction),
+        ...(incoming.siteSettings?.underConstruction || {})
+      }
+    }
+  };
+  if (Array.isArray(merged.guests)) {
+    merged.guests = merged.guests.map((g) => normalizeGuestPlusOnes(g));
+  }
+  syncReceptionMenuOptions(merged);
+  saveDatabase(merged, 'Restored full website & guest database from backup', 'backup-restore');
+  const reloaded = loadDatabase();
+  res.json({
+    message: 'Full database backup restored and saved to disk!',
+    db: reloaded,
+    analytics: computeAnalytics(reloaded.guests, reloaded.reception?.menuOptions)
   });
 });
 
