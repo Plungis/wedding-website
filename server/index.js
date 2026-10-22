@@ -1,0 +1,439 @@
+import express from 'express';
+import cors from 'cors';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import QRCode from 'qrcode';
+import { defaultDatabase } from './defaultData.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const DATA_DIR = path.join(__dirname, 'data');
+const DB_PATH = path.join(DATA_DIR, 'db.json');
+
+const app = express();
+const PORT = process.env.PORT || 3001;
+
+app.use(cors());
+app.use(express.json({ limit: '10mb' }));
+
+// Ensure data directory and database file exist
+function loadDatabase() {
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    if (!fs.existsSync(DB_PATH)) {
+      fs.writeFileSync(DB_PATH, JSON.stringify(defaultDatabase, null, 2), 'utf-8');
+      return structuredClone(defaultDatabase);
+    }
+    const raw = fs.readFileSync(DB_PATH, 'utf-8');
+    const parsed = JSON.parse(raw);
+    return {
+      ...structuredClone(defaultDatabase),
+      ...parsed
+    };
+  } catch (err) {
+    console.error('Error loading database, falling back to default:', err);
+    return structuredClone(defaultDatabase);
+  }
+}
+
+function saveDatabase(db, revisionSummary = null, section = 'cms') {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+  if (revisionSummary) {
+    db.revisions = [
+      {
+        id: `rev-${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        section,
+        summary: revisionSummary
+      },
+      ...(db.revisions || []).slice(0, 49)
+    ];
+  }
+  const tempPath = `${DB_PATH}.tmp`;
+  fs.writeFileSync(tempPath, JSON.stringify(db, null, 2), 'utf-8');
+  fs.renameSync(tempPath, DB_PATH);
+}
+
+function computeAnalytics(guests = [], menuOptions = []) {
+  let totalHouseholds = guests.length;
+  let respondedHouseholds = 0;
+  let pendingHouseholds = 0;
+  let totalInvitedSeats = 0;
+  let attendingCount = 0;
+  let declinedCount = 0;
+  let pendingSeats = 0;
+  const mealCounts = {};
+
+  menuOptions.forEach((m) => {
+    mealCounts[m.name] = 0;
+  });
+
+  guests.forEach((guest) => {
+    if (guest.rsvpStatus === 'responded') {
+      respondedHouseholds += 1;
+    } else {
+      pendingHouseholds += 1;
+    }
+    (guest.members || []).forEach((member) => {
+      totalInvitedSeats += 1;
+      if (member.attending === true) {
+        attendingCount += 1;
+        if (member.mealChoice) {
+          mealCounts[member.mealChoice] = (mealCounts[member.mealChoice] || 0) + 1;
+        }
+      } else if (member.attending === false) {
+        declinedCount += 1;
+      } else {
+        pendingSeats += 1;
+      }
+    });
+  });
+
+  return {
+    totalHouseholds,
+    respondedHouseholds,
+    pendingHouseholds,
+    totalInvitedSeats,
+    attendingCount,
+    declinedCount,
+    pendingSeats,
+    mealCounts
+  };
+}
+
+function requireAdmin(req, res, next) {
+  const db = loadDatabase();
+  const provided = req.headers['x-admin-passcode'] || req.query.passcode || req.body?.passcode;
+  const expected = db.siteSettings?.adminPasscode || 'wedding2026';
+  if (provided !== expected) {
+    return res.status(401).json({ error: 'Invalid admin passcode. Default passcode is wedding2026.' });
+  }
+  req.db = db;
+  next();
+}
+
+const CODE_PREFIXES = ['ROSE', 'OLIVE', 'CHAMP', 'VELVET', 'GARDEN', 'LILY', 'VINE', 'GOLD', 'PEONY', 'CYPRESS'];
+
+function generateUniqueGuestCode(existingGuests = []) {
+  const existingCodes = new Set(existingGuests.map((g) => (g.code || '').toUpperCase()));
+  for (let i = 0; i < 100; i++) {
+    const prefix = CODE_PREFIXES[Math.floor(Math.random() * CODE_PREFIXES.length)];
+    const digits = Math.floor(1000 + Math.random() * 9000);
+    const candidate = `${prefix}-${digits}`;
+    if (!existingCodes.has(candidate)) {
+      return candidate;
+    }
+  }
+  return `INV-${Date.now().toString().slice(-4)}`;
+}
+
+// 1. Public content endpoint
+app.get('/api/content', (req, res) => {
+  const db = loadDatabase();
+  const { adminPasscode, ...publicSettings } = db.siteSettings || {};
+  // Provide demo guest codes list (just code + householdName) so users testing the site can see how QR codes work
+  const sampleInvites = (db.guests || []).map((g) => ({
+    code: g.code,
+    householdName: g.householdName,
+    rsvpStatus: g.rsvpStatus,
+    memberCount: (g.members || []).length
+  }));
+
+  res.json({
+    siteSettings: publicSettings,
+    aboutUs: db.aboutUs,
+    ceremony: db.ceremony,
+    reception: db.reception,
+    sampleInvites
+  });
+});
+
+// 2. Public QR Code lookup for RSVP
+app.get('/api/rsvp/:code', (req, res) => {
+  const db = loadDatabase();
+  const rawInput = (req.params.code || '').trim().toUpperCase();
+  const guest = (db.guests || []).find((g) => (g.code || '').toUpperCase() === rawInput);
+
+  if (!guest) {
+    return res.status(404).json({
+      error: `We couldn't find an invitation matching code "${rawInput}". Please double-check your invitation card or scan your QR code again.`
+    });
+  }
+
+  res.json({
+    guest,
+    menuOptions: db.reception?.menuOptions || [],
+    rsvpDeadline: db.siteSettings?.rsvpDeadline || ''
+  });
+});
+
+// 3. Submit RSVP using unique QR code
+app.post('/api/rsvp/:code', (req, res) => {
+  const db = loadDatabase();
+  const rawInput = (req.params.code || '').trim().toUpperCase();
+  const guestIndex = (db.guests || []).findIndex((g) => (g.code || '').toUpperCase() === rawInput);
+
+  if (guestIndex === -1) {
+    return res.status(404).json({ error: 'Invitation code not found.' });
+  }
+
+  const existing = db.guests[guestIndex];
+  const { members, dietaryNotes, songRequest, messageToCouple, email, phone } = req.body;
+
+  const updatedMembers = Array.isArray(members)
+    ? members.map((m, idx) => ({
+        id: m.id || `m-${Date.now()}-${idx}`,
+        name: (m.name || `Guest ${idx + 1}`).trim(),
+        attending: m.attending === true ? true : m.attending === false ? false : false,
+        mealChoice: m.attending ? m.mealChoice || '' : '',
+        dietary: (m.dietary || '').trim()
+      }))
+    : existing.members;
+
+  const updatedGuest = {
+    ...existing,
+    email: email !== undefined ? email : existing.email,
+    phone: phone !== undefined ? phone : existing.phone,
+    members: updatedMembers,
+    dietaryNotes: dietaryNotes !== undefined ? dietaryNotes : existing.dietaryNotes,
+    songRequest: songRequest !== undefined ? songRequest : existing.songRequest,
+    messageToCouple: messageToCouple !== undefined ? messageToCouple : existing.messageToCouple,
+    rsvpStatus: 'responded',
+    respondedAt: new Date().toISOString()
+  };
+
+  db.guests[guestIndex] = updatedGuest;
+  const attendingTotal = updatedMembers.filter((m) => m.attending).length;
+  saveDatabase(
+    db,
+    `RSVP received from ${updatedGuest.householdName} (${ updatedGuest.code }): ${attendingTotal}/${updatedMembers.length} attending`,
+    'rsvp'
+  );
+
+  res.json({
+    message: 'Your RSVP has been saved! Thank you for responding.',
+    guest: updatedGuest
+  });
+});
+
+// 4. Generate QR code image & SVG for any guest code
+app.get('/api/qr/:code', async (req, res) => {
+  try {
+    const code = (req.params.code || '').trim().toUpperCase();
+    const baseUrl = req.query.baseUrl || 'http://localhost:5173';
+    const cleanBase = baseUrl.replace(/\/$/, '');
+    const targetUrl = `${cleanBase}/?rsvp=${encodeURIComponent(code)}`;
+
+    const dataUrl = await QRCode.toDataURL(targetUrl, {
+      width: 360,
+      margin: 2,
+      color: {
+        dark: '#1f2d24',
+        light: '#ffffff'
+      }
+    });
+
+    const svg = await QRCode.toString(targetUrl, {
+      type: 'svg',
+      margin: 2,
+      color: {
+        dark: '#1f2d24',
+        light: '#ffffff'
+      }
+    });
+
+    res.json({
+      code,
+      targetUrl,
+      dataUrl,
+      svg
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to generate QR code', details: err.message });
+  }
+});
+
+// 5. Admin Authentication & Full CMS Data Load
+app.post('/api/admin/login', (req, res) => {
+  const db = loadDatabase();
+  const { passcode } = req.body || {};
+  const expected = db.siteSettings?.adminPasscode || 'wedding2026';
+
+  if (passcode !== expected) {
+    return res.status(401).json({ error: 'Incorrect passcode. Try "wedding2026".' });
+  }
+
+  res.json({
+    authenticated: true,
+    db,
+    analytics: computeAnalytics(db.guests, db.reception?.menuOptions)
+  });
+});
+
+app.get('/api/admin/data', requireAdmin, (req, res) => {
+  const db = req.db;
+  res.json({
+    db,
+    analytics: computeAnalytics(db.guests, db.reception?.menuOptions)
+  });
+});
+
+// 6. Update CMS Section (siteSettings, aboutUs, ceremony, reception)
+app.put('/api/admin/section/:sectionName', requireAdmin, (req, res) => {
+  const db = req.db;
+  const { sectionName } = req.params;
+  const allowedSections = ['siteSettings', 'aboutUs', 'ceremony', 'reception'];
+
+  if (!allowedSections.includes(sectionName)) {
+    return res.status(400).json({ error: `Invalid section: ${sectionName}` });
+  }
+
+  db[sectionName] = req.body.data;
+  saveDatabase(db, `Updated ${sectionName} content via CMS`, sectionName);
+
+  res.json({
+    message: `${sectionName} updated successfully`,
+    db,
+    analytics: computeAnalytics(db.guests, db.reception?.menuOptions)
+  });
+});
+
+// 7. Create a new Guest Household & Unique QR Code
+app.post('/api/admin/guests', requireAdmin, (req, res) => {
+  const db = req.db;
+  const payload = req.body || {};
+
+  const customCode = (payload.code || '').trim().toUpperCase();
+  const code = customCode || generateUniqueGuestCode(db.guests);
+
+  if (db.guests.some((g) => g.code.toUpperCase() === code)) {
+    return res.status(400).json({ error: `Invitation code "${code}" is already in use.` });
+  }
+
+  const members = Array.isArray(payload.members) && payload.members.length > 0
+    ? payload.members.map((m, i) => ({
+        id: m.id || `m-${Date.now()}-${i}`,
+        name: (m.name || `Guest ${i + 1}`).trim(),
+        attending: m.attending ?? null,
+        mealChoice: m.mealChoice || '',
+        dietary: m.dietary || ''
+      }))
+    : [
+        {
+          id: `m-${Date.now()}-0`,
+          name: payload.householdName || 'Primary Guest',
+          attending: null,
+          mealChoice: '',
+          dietary: ''
+        }
+      ];
+
+  const newGuest = {
+    id: `guest-${Date.now()}`,
+    code,
+    householdName: (payload.householdName || 'New Guest Household').trim(),
+    email: (payload.email || '').trim(),
+    phone: (payload.phone || '').trim(),
+    tableNumber: (payload.tableNumber || '').trim(),
+    personalNote: (payload.personalNote || '').trim(),
+    rsvpStatus: payload.rsvpStatus || 'pending',
+    respondedAt: payload.rsvpStatus === 'responded' ? new Date().toISOString() : null,
+    dietaryNotes: payload.dietaryNotes || '',
+    songRequest: payload.songRequest || '',
+    messageToCouple: payload.messageToCouple || '',
+    members
+  };
+
+  db.guests.unshift(newGuest);
+  saveDatabase(db, `Added guest household "${newGuest.householdName}" with QR code ${newGuest.code}`, 'guests');
+
+  res.status(201).json({
+    guest: newGuest,
+    db,
+    analytics: computeAnalytics(db.guests, db.reception?.menuOptions)
+  });
+});
+
+// 8. Update Guest Household or regenerate QR code
+app.put('/api/admin/guests/:id', requireAdmin, (req, res) => {
+  const db = req.db;
+  const { id } = req.params;
+  const idx = db.guests.findIndex((g) => g.id === id);
+
+  if (idx === -1) {
+    return res.status(404).json({ error: 'Guest household not found.' });
+  }
+
+  const payload = req.body || {};
+  const newCode = (payload.code || db.guests[idx].code).trim().toUpperCase();
+
+  const duplicate = db.guests.some((g, i) => i !== idx && g.code.toUpperCase() === newCode);
+  if (duplicate) {
+    return res.status(400).json({ error: `QR code "${newCode}" is already assigned to another household.` });
+  }
+
+  db.guests[idx] = {
+    ...db.guests[idx],
+    ...payload,
+    code: newCode
+  };
+
+  saveDatabase(db, `Updated guest household "${db.guests[idx].householdName}" (${newCode})`, 'guests');
+
+  res.json({
+    guest: db.guests[idx],
+    db,
+    analytics: computeAnalytics(db.guests, db.reception?.menuOptions)
+  });
+});
+
+// 9. Delete Guest Household
+app.delete('/api/admin/guests/:id', requireAdmin, (req, res) => {
+  const db = req.db;
+  const { id } = req.params;
+  const target = db.guests.find((g) => g.id === id);
+
+  if (!target) {
+    return res.status(404).json({ error: 'Guest household not found.' });
+  }
+
+  db.guests = db.guests.filter((g) => g.id !== id);
+  saveDatabase(db, `Removed guest household "${target.householdName}" (${target.code})`, 'guests');
+
+  res.json({
+    db,
+    analytics: computeAnalytics(db.guests, db.reception?.menuOptions)
+  });
+});
+
+// 10. Reset CMS to Default Data
+app.post('/api/admin/reset', requireAdmin, (req, res) => {
+  const fresh = structuredClone(defaultDatabase);
+  saveDatabase(fresh, 'Reset all CMS content and guest data to factory defaults', 'system');
+  res.json({
+    db: fresh,
+    analytics: computeAnalytics(fresh.guests, fresh.reception?.menuOptions)
+  });
+});
+
+// Serve compiled React frontend in production / Docker
+const DIST_DIR = path.join(__dirname, '..', 'dist');
+if (fs.existsSync(DIST_DIR)) {
+  app.use(express.static(DIST_DIR));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) return next();
+    res.sendFile(path.join(DIST_DIR, 'index.html'));
+  });
+}
+
+app.listen(PORT, '0.0.0.0', () => {
+  loadDatabase();
+  console.log(`Wedding CMS & QR RSVP Server running at http://0.0.0.0:${PORT}`);
+});
+

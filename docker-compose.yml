@@ -1,0 +1,12 @@
+services:
+  wedding-website:
+    build: .
+    container_name: wedding-website
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - NODE_ENV=production
+    volumes:
+      - ./data:/app/server/data
