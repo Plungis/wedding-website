@@ -27,6 +27,53 @@ function syncReceptionMenuOptions(db) {
   }
 }
 
+function normalizeGuestPlusOnes(guest) {
+  if (!guest) return guest;
+  const rawMembers = Array.isArray(guest.members) ? guest.members : [];
+  const normalized = rawMembers.map((m, i) => {
+    const looksLikePlusOne =
+      Boolean(m.isPlusOne) ||
+      /\(plus one\)|\+1 guest|^plus one$/i.test((m.name || '').trim());
+    const cleanedName =
+      looksLikePlusOne && /^(\+1 guest|plus one|guest \d+|alex rivera \(plus one\))$/i.test((m.name || '').trim())
+        ? ''
+        : (m.name || '').trim();
+    return {
+      ...m,
+      id: m.id || `m-${Date.now()}-${i}`,
+      isPlusOne: looksLikePlusOne,
+      name: cleanedName
+    };
+  });
+
+  const existingPlusOnes = normalized.filter((m) => m.isPlusOne);
+  const targetPlusOnes =
+    guest.plusOnesAllowed !== undefined && guest.plusOnesAllowed !== null
+      ? Math.max(0, Number(guest.plusOnesAllowed))
+      : existingPlusOnes.length;
+
+  const namedMembers = normalized.filter((m) => !m.isPlusOne);
+  const finalPlusOnes = [...existingPlusOnes];
+
+  while (finalPlusOnes.length < targetPlusOnes) {
+    finalPlusOnes.push({
+      id: `plusone-${Date.now()}-${finalPlusOnes.length}`,
+      name: '',
+      isPlusOne: true,
+      attending: null,
+      mealChoice: '',
+      dietary: ''
+    });
+  }
+
+  const trimmedPlusOnes = finalPlusOnes.slice(0, targetPlusOnes);
+  return {
+    ...guest,
+    plusOnesAllowed: targetPlusOnes,
+    members: [...namedMembers, ...trimmedPlusOnes]
+  };
+}
+
 // Ensure data directory and database file exist
 function loadDatabase() {
   try {
@@ -64,6 +111,9 @@ function loadDatabase() {
     };
     if (!merged.siteSettings.theme || merged.siteSettings.theme === 'fall-goth') {
       merged.siteSettings.theme = 'cathedral-roses';
+    }
+    if (Array.isArray(merged.guests)) {
+      merged.guests = merged.guests.map((g) => normalizeGuestPlusOnes(g));
     }
     syncReceptionMenuOptions(merged);
     return merged;
@@ -175,7 +225,8 @@ app.get('/api/content', (req, res) => {
     code: g.code,
     householdName: g.householdName,
     rsvpStatus: g.rsvpStatus,
-    memberCount: (g.members || []).length
+    memberCount: (g.members || []).length,
+    plusOnesAllowed: g.plusOnesAllowed || (g.members || []).filter((m) => m.isPlusOne).length
   }));
 
   res.json({
@@ -220,13 +271,17 @@ app.post('/api/rsvp/:code', (req, res) => {
   const { members, dietaryNotes, songRequest, messageToCouple, email, phone } = req.body;
 
   const updatedMembers = Array.isArray(members)
-    ? members.map((m, idx) => ({
-        id: m.id || `m-${Date.now()}-${idx}`,
-        name: (m.name || `Guest ${idx + 1}`).trim(),
-        attending: m.attending === true ? true : m.attending === false ? false : false,
-        mealChoice: m.attending ? m.mealChoice || '' : '',
-        dietary: (m.dietary || '').trim()
-      }))
+    ? members.map((m, idx) => {
+        const isPlusOne = Boolean(m.isPlusOne);
+        return {
+          id: m.id || `m-${Date.now()}-${idx}`,
+          name: (m.name || (isPlusOne ? '' : `Guest ${idx + 1}`)).trim(),
+          isPlusOne,
+          attending: m.attending === true ? true : m.attending === false ? false : false,
+          mealChoice: m.attending ? m.mealChoice || '' : '',
+          dietary: (m.dietary || '').trim()
+        };
+      })
     : existing.members;
 
   const updatedGuest = {
@@ -370,10 +425,13 @@ app.post('/api/admin/guests', requireAdmin, (req, res) => {
     return res.status(400).json({ error: `Invitation code "${code}" is already in use.` });
   }
 
-  const members = Array.isArray(payload.members) && payload.members.length > 0
+  const plusOnesAllowed = Math.max(0, Number(payload.plusOnesAllowed || 0));
+
+  const namedMembers = Array.isArray(payload.members) && payload.members.length > 0
     ? payload.members.map((m, i) => ({
         id: m.id || `m-${Date.now()}-${i}`,
-        name: (m.name || `Guest ${i + 1}`).trim(),
+        name: (m.name || (m.isPlusOne ? '' : `Guest ${i + 1}`)).trim(),
+        isPlusOne: Boolean(m.isPlusOne),
         attending: m.attending ?? null,
         mealChoice: m.mealChoice || '',
         dietary: m.dietary || ''
@@ -382,16 +440,18 @@ app.post('/api/admin/guests', requireAdmin, (req, res) => {
         {
           id: `m-${Date.now()}-0`,
           name: payload.householdName || 'Primary Guest',
+          isPlusOne: false,
           attending: null,
           mealChoice: '',
           dietary: ''
         }
       ];
 
-  const newGuest = {
+  const newGuest = normalizeGuestPlusOnes({
     id: `guest-${Date.now()}`,
     code,
     householdName: (payload.householdName || 'New Guest Household').trim(),
+    plusOnesAllowed,
     email: (payload.email || '').trim(),
     phone: (payload.phone || '').trim(),
     tableNumber: (payload.tableNumber || '').trim(),
@@ -401,8 +461,8 @@ app.post('/api/admin/guests', requireAdmin, (req, res) => {
     dietaryNotes: payload.dietaryNotes || '',
     songRequest: payload.songRequest || '',
     messageToCouple: payload.messageToCouple || '',
-    members
-  };
+    members: namedMembers
+  });
 
   db.guests.unshift(newGuest);
   saveDatabase(db, `Added guest household "${newGuest.householdName}" with QR code ${newGuest.code}`, 'guests');
@@ -432,11 +492,11 @@ app.put('/api/admin/guests/:id', requireAdmin, (req, res) => {
     return res.status(400).json({ error: `QR code "${newCode}" is already assigned to another household.` });
   }
 
-  db.guests[idx] = {
+  db.guests[idx] = normalizeGuestPlusOnes({
     ...db.guests[idx],
     ...payload,
     code: newCode
-  };
+  });
 
   saveDatabase(db, `Updated guest household "${db.guests[idx].householdName}" (${newCode})`, 'guests');
 

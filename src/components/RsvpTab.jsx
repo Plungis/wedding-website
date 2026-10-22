@@ -14,7 +14,8 @@ import {
   Search,
   RefreshCw,
   AlertCircle,
-  Eye
+  Eye,
+  UserPlus
 } from 'lucide-react';
 
 function extractCodeFromRawText(rawText = '') {
@@ -251,6 +252,17 @@ export default function RsvpTab({
   async function handleSubmitRsvp(e) {
     e.preventDefault();
     if (!guestData) return;
+
+    // Validate that any attending +1 guest has their name filled out
+    const missingPlusOneName = (guestData.members || []).some(
+      (m) => m.isPlusOne && m.attending === true && !(m.name || '').trim()
+    );
+    if (missingPlusOneName) {
+      setError(
+        'Please enter the full name of the +1 guest you will be bringing (or select "Not Bringing a +1" if attending solo).'
+      );
+      return;
+    }
 
     setSaving(true);
     setError('');
@@ -520,7 +532,8 @@ export default function RsvpTab({
                       CODE: {inv.code}
                     </div>
                     <div style={{ fontSize: '0.73rem', opacity: 0.8, marginTop: '0.2rem' }}>
-                      {inv.memberCount} {inv.memberCount === 1 ? 'Guest' : 'Guests'} •{' '}
+                      {inv.memberCount} {inv.memberCount === 1 ? 'Seat' : 'Seats'}
+                      {inv.plusOnesAllowed > 0 ? ` (Includes +${inv.plusOnesAllowed})` : ''} •{' '}
                       {inv.rsvpStatus === 'responded' ? 'Responded ✓' : 'Awaiting RSVP'}
                     </div>
                   </div>
@@ -672,88 +685,167 @@ export default function RsvpTab({
               Please indicate whether each member of your party will attend and choose their plated dinner entrée.
             </p>
 
-            {(guestData.members || []).map((member, idx) => (
-              <div key={member.id || idx} className="rsvp-member-row">
+            {(guestData.members || []).map((member, idx) => {
+              const isPlusOne = Boolean(member.isPlusOne);
+              return (
                 <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                    gap: '1.25rem',
-                    alignItems: 'center'
-                  }}
+                  key={member.id || idx}
+                  className="rsvp-member-row"
+                  style={
+                    isPlusOne
+                      ? {
+                          border: '1.5px solid var(--border-gold)',
+                          background: 'linear-gradient(145deg, var(--bg-secondary), var(--bg-accent-subtle))'
+                        }
+                      : undefined
+                  }
                 >
-                  <div>
-                    <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', fontWeight: 700 }}>
-                      Guest {idx + 1}
-                    </span>
-                    <div className="serif-font" style={{ fontSize: '1.65rem', fontWeight: 700 }}>
-                      {member.name}
-                    </div>
-                  </div>
-
-                  <div className="attendance-toggle-group">
-                    <button
-                      type="button"
-                      className={`attendance-btn yes ${member.attending === true ? 'selected' : ''}`}
-                      onClick={() => updateMemberField(member.id, 'attending', true)}
-                    >
-                      <CheckCircle2 size={18} /> Joyfully Accepts
-                    </button>
-                    <button
-                      type="button"
-                      className={`attendance-btn no ${member.attending === false ? 'selected' : ''}`}
-                      onClick={() => updateMemberField(member.id, 'attending', false)}
-                    >
-                      <XCircle size={18} /> Regretfully Declines
-                    </button>
-                  </div>
-                </div>
-
-                {member.attending === true && (
                   <div
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-                      gap: '1rem',
-                      marginTop: '1.15rem',
-                      paddingTop: '1.15rem',
-                      borderTop: '1px dashed var(--border-color)'
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                      gap: '1.25rem',
+                      alignItems: 'center'
                     }}
                   >
                     <div>
-                      <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.35rem' }}>
-                        <Utensils size={13} /> Plated Dinner Entrée Selection
-                      </label>
-                      <select
-                        className="form-select"
-                        value={member.mealChoice || ''}
-                        onChange={(e) => updateMemberField(member.id, 'mealChoice', e.target.value)}
-                      >
-                        <option value="">-- Choose an Entrée --</option>
-                        {availableMeals.map((meal) => (
-                          <option key={meal.id || meal.name} value={meal.name}>
-                            {meal.name} ({meal.tag})
-                          </option>
-                        ))}
-                      </select>
+                      {isPlusOne ? (
+                        <>
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.35rem',
+                              fontSize: '0.74rem',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.1em',
+                              color: 'var(--accent-secondary)',
+                              fontWeight: 700,
+                              background: 'rgba(212, 168, 83, 0.14)',
+                              border: '1px solid var(--border-gold)',
+                              padding: '0.22rem 0.65rem',
+                              borderRadius: '999px',
+                              marginBottom: '0.35rem'
+                            }}
+                          >
+                            <UserPlus size={13} /> +1 Guest Option Included
+                          </span>
+                          <div className="serif-font" style={{ fontSize: '1.6rem', fontWeight: 700 }}>
+                            {member.name ? `+1: ${member.name}` : 'Your +1 Guest'}
+                          </div>
+                          <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                            Will you be bringing a +1 guest with you?
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', fontWeight: 700 }}>
+                            Guest {idx + 1}
+                          </span>
+                          <div className="serif-font" style={{ fontSize: '1.65rem', fontWeight: 700 }}>
+                            {member.name}
+                          </div>
+                        </>
+                      )}
                     </div>
 
-                    <div>
-                      <label className="form-label" style={{ display: 'block', marginBottom: '0.35rem' }}>
-                        Dietary Restrictions / Allergies (Optional)
-                      </label>
-                      <input
-                        type="text"
-                        className="form-input"
-                        placeholder="e.g., Gluten-free, nut allergy, vegan..."
-                        value={member.dietary || ''}
-                        onChange={(e) => updateMemberField(member.id, 'dietary', e.target.value)}
-                      />
+                    <div className="attendance-toggle-group">
+                      <button
+                        type="button"
+                        className={`attendance-btn yes ${member.attending === true ? 'selected' : ''}`}
+                        onClick={() => updateMemberField(member.id, 'attending', true)}
+                      >
+                        <CheckCircle2 size={18} /> {isPlusOne ? 'Bringing a +1 Guest' : 'Joyfully Accepts'}
+                      </button>
+                      <button
+                        type="button"
+                        className={`attendance-btn no ${member.attending === false ? 'selected' : ''}`}
+                        onClick={() => updateMemberField(member.id, 'attending', false)}
+                      >
+                        <XCircle size={18} /> {isPlusOne ? 'Not Bringing a +1' : 'Regretfully Declines'}
+                      </button>
                     </div>
                   </div>
-                )}
-              </div>
-            ))}
+
+                  {member.attending === true && (
+                    <div
+                      style={{
+                        marginTop: '1.15rem',
+                        paddingTop: '1.15rem',
+                        borderTop: '1px dashed var(--border-color)'
+                      }}
+                    >
+                      {isPlusOne && (
+                        <div className="form-group" style={{ marginBottom: '1rem' }}>
+                          <label
+                            className="form-label"
+                            style={{
+                              color: 'var(--accent-secondary)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.4rem'
+                            }}
+                          >
+                            <UserPlus size={14} /> Who Will You Be Bringing? (+1 Guest Full Name) *
+                          </label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            placeholder="Enter your +1 guest's first & last name (for seating & place card)..."
+                            value={member.name || ''}
+                            onChange={(e) => updateMemberField(member.id, 'name', e.target.value)}
+                            style={{
+                              borderColor: 'var(--accent-secondary)',
+                              fontSize: '1rem',
+                              fontWeight: 600
+                            }}
+                          />
+                        </div>
+                      )}
+
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                          gap: '1rem'
+                        }}
+                      >
+                        <div>
+                          <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.35rem' }}>
+                            <Utensils size={13} /> {isPlusOne ? "+1 Guest's Plated Dinner Entrée" : 'Plated Dinner Entrée Selection'}
+                          </label>
+                          <select
+                            className="form-select"
+                            value={member.mealChoice || ''}
+                            onChange={(e) => updateMemberField(member.id, 'mealChoice', e.target.value)}
+                          >
+                            <option value="">-- Choose an Entrée --</option>
+                            {availableMeals.map((meal) => (
+                              <option key={meal.id || meal.name} value={meal.name}>
+                                {meal.name} ({meal.tag})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="form-label" style={{ display: 'block', marginBottom: '0.35rem' }}>
+                            {isPlusOne ? "+1 Guest's Dietary Restrictions / Allergies" : 'Dietary Restrictions / Allergies (Optional)'}
+                          </label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            placeholder="e.g., Gluten-free, nut allergy, vegan..."
+                            value={member.dietary || ''}
+                            onChange={(e) => updateMemberField(member.id, 'dietary', e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           {/* Household Contact, Song Request & Note to Couple */}

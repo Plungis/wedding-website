@@ -33,7 +33,8 @@ import {
   Move,
   ZoomIn,
   Scissors,
-  Calendar
+  Calendar,
+  UserPlus
 } from 'lucide-react';
 
 function toDateTimeLocalValue(isoStr) {
@@ -793,6 +794,7 @@ export default function CmsPortal({
     email: '',
     tableNumber: '',
     personalNote: '',
+    plusOnesAllowed: 0,
     memberNames: ['']
   });
 
@@ -1013,6 +1015,7 @@ export default function CmsPortal({
       (name, idx) => ({
         id: `m-${Date.now()}-${idx}`,
         name,
+        isPlusOne: false,
         attending: null,
         mealChoice: '',
         dietary: ''
@@ -1032,6 +1035,7 @@ export default function CmsPortal({
           email: newGuestForm.email,
           tableNumber: newGuestForm.tableNumber,
           personalNote: newGuestForm.personalNote,
+          plusOnesAllowed: Number(newGuestForm.plusOnesAllowed || 0),
           members
         })
       });
@@ -1046,6 +1050,7 @@ export default function CmsPortal({
           email: '',
           tableNumber: '',
           personalNote: '',
+          plusOnesAllowed: 0,
           memberNames: ['']
         });
         setSavingStatus(`✓ Created QR Invitation for ${data.guest.householdName} (${data.guest.code})`);
@@ -1056,6 +1061,36 @@ export default function CmsPortal({
       }
     } catch {
       alert('Failed to create guest household.');
+    }
+  }
+
+  async function handleQuickSetPlusOnes(guest, nextPlusOnesCount) {
+    try {
+      const res = await fetch(`/api/admin/guests/${guest.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-passcode': passcode
+        },
+        body: JSON.stringify({
+          ...guest,
+          plusOnesAllowed: Number(nextPlusOnesCount)
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCmsDb(data.db);
+        setAnalytics(data.analytics);
+        setSavingStatus(
+          Number(nextPlusOnesCount) > 0
+            ? `✓ Enabled +${nextPlusOnesCount} guest option for ${guest.householdName}`
+            : `✓ Removed +1 option for ${guest.householdName}`
+        );
+        if (onContentUpdated) onContentUpdated();
+        setTimeout(() => setSavingStatus(''), 3000);
+      }
+    } catch {
+      // ignore
     }
   }
 
@@ -3459,52 +3494,95 @@ export default function CmsPortal({
                   </div>
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">Individual Guests in This Party</label>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {newGuestForm.memberNames.map((name, idx) => (
-                      <div key={idx} style={{ display: 'flex', gap: '0.5rem' }}>
-                        <input
-                          type="text"
-                          className="form-input"
-                          placeholder={`Guest ${idx + 1} Full Name`}
-                          value={name}
-                          onChange={(e) => {
-                            const updated = [...newGuestForm.memberNames];
-                            updated[idx] = e.target.value;
-                            setNewGuestForm({ ...newGuestForm, memberNames: updated });
-                          }}
-                        />
-                        {newGuestForm.memberNames.length > 1 && (
-                          <button
-                            type="button"
-                            className="btn-danger"
-                            onClick={() => {
-                              setNewGuestForm({
-                                ...newGuestForm,
-                                memberNames: newGuestForm.memberNames.filter((_, i) => i !== idx)
-                              });
+                <div className="grid-2" style={{ gap: '1rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">Named Guests in This Party</label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      {newGuestForm.memberNames.map((name, idx) => (
+                        <div key={idx} style={{ display: 'flex', gap: '0.5rem' }}>
+                          <input
+                            type="text"
+                            className="form-input"
+                            placeholder={`Guest ${idx + 1} Full Name`}
+                            value={name}
+                            onChange={(e) => {
+                              const updated = [...newGuestForm.memberNames];
+                              updated[idx] = e.target.value;
+                              setNewGuestForm({ ...newGuestForm, memberNames: updated });
                             }}
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        )}
-                      </div>
-                    ))}
+                          />
+                          {newGuestForm.memberNames.length > 1 && (
+                            <button
+                              type="button"
+                              className="btn-danger"
+                              onClick={() => {
+                                setNewGuestForm({
+                                  ...newGuestForm,
+                                  memberNames: newGuestForm.memberNames.filter((_, i) => i !== idx)
+                                });
+                              }}
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      style={{ alignSelf: 'flex-start', marginTop: '0.5rem', padding: '0.45rem 0.9rem', fontSize: '0.82rem' }}
+                      onClick={() =>
+                        setNewGuestForm({
+                          ...newGuestForm,
+                          memberNames: [...newGuestForm.memberNames, '']
+                        })
+                      }
+                    >
+                      <Plus size={14} /> Add Another Named Guest
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    style={{ alignSelf: 'flex-start', marginTop: '0.5rem', padding: '0.45rem 0.9rem', fontSize: '0.82rem' }}
-                    onClick={() =>
-                      setNewGuestForm({
-                        ...newGuestForm,
-                        memberNames: [...newGuestForm.memberNames, '']
-                      })
-                    }
+
+                  <div
+                    className="form-group"
+                    style={{
+                      background: 'var(--bg-secondary)',
+                      border: '1.5px solid var(--border-gold)',
+                      borderRadius: '14px',
+                      padding: '1rem'
+                    }}
                   >
-                    <Plus size={14} /> Add Another Party Member
-                  </button>
+                    <label
+                      className="form-label"
+                      style={{
+                        color: 'var(--accent-secondary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.4rem'
+                      }}
+                    >
+                      <UserPlus size={15} /> +1 Guest Option (Guest Fills Out Who They Bring)
+                    </label>
+                    <select
+                      className="form-select"
+                      value={newGuestForm.plusOnesAllowed || 0}
+                      onChange={(e) =>
+                        setNewGuestForm({
+                          ...newGuestForm,
+                          plusOnesAllowed: Number(e.target.value)
+                        })
+                      }
+                    >
+                      <option value={0}>No +1 Option (Only Named Guests Above)</option>
+                      <option value={1}>Allow +1 Guest (Guest Fills Out Their Date's Name)</option>
+                      <option value={2}>Allow +2 Additional Guests (Guest Fills Out Names)</option>
+                      <option value={3}>Allow +3 Additional Guests (Guest Fills Out Names)</option>
+                      <option value={4}>Allow +4 Additional Guests (Guest Fills Out Names)</option>
+                    </select>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+                      When enabled, scanning their QR code shows a dedicated <strong>"+1 Guest Option"</strong> section where they choose whether they are bringing someone, type their +1's full name, and pick their +1's dinner entrée.
+                    </p>
+                  </div>
                 </div>
 
                 <div className="form-group">
@@ -3575,32 +3653,99 @@ export default function CmsPortal({
                   </div>
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">Personal Welcome Message on RSVP Page</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={editingGuest.personalNote || ''}
-                    onChange={(e) => setEditingGuest({ ...editingGuest, personalNote: e.target.value })}
-                  />
+                <div className="grid-2" style={{ gap: '1rem', marginBottom: '0.75rem' }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Personal Welcome Message on RSVP Page</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={editingGuest.personalNote || ''}
+                      onChange={(e) => setEditingGuest({ ...editingGuest, personalNote: e.target.value })}
+                    />
+                  </div>
+
+                  <div
+                    className="form-group"
+                    style={{
+                      marginBottom: 0,
+                      background: 'var(--bg-secondary)',
+                      border: '1px solid var(--border-gold)',
+                      borderRadius: '12px',
+                      padding: '0.75rem'
+                    }}
+                  >
+                    <label className="form-label" style={{ color: 'var(--accent-secondary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <UserPlus size={14} /> +1 Guest Option Allowed for This QR Code
+                    </label>
+                    <select
+                      className="form-select"
+                      value={
+                        editingGuest.plusOnesAllowed !== undefined
+                          ? editingGuest.plusOnesAllowed
+                          : (editingGuest.members || []).filter((m) => m.isPlusOne).length
+                      }
+                      onChange={(e) => {
+                        const targetCount = Number(e.target.value);
+                        const existingMembers = editingGuest.members || [];
+                        const named = existingMembers.filter((m) => !m.isPlusOne);
+                        const plusOnes = existingMembers.filter((m) => m.isPlusOne);
+                        while (plusOnes.length < targetCount) {
+                          plusOnes.push({
+                            id: `plusone-${Date.now()}-${plusOnes.length}`,
+                            name: '',
+                            isPlusOne: true,
+                            attending: null,
+                            mealChoice: '',
+                            dietary: ''
+                          });
+                        }
+                        setEditingGuest({
+                          ...editingGuest,
+                          plusOnesAllowed: targetCount,
+                          members: [...named, ...plusOnes.slice(0, targetCount)]
+                        });
+                      }}
+                    >
+                      <option value={0}>No +1 Option (0)</option>
+                      <option value={1}>+1 Guest Allowed (Guest Fills Name)</option>
+                      <option value={2}>+2 Additional Guests Allowed</option>
+                      <option value={3}>+3 Additional Guests Allowed</option>
+                      <option value={4}>+4 Additional Guests Allowed</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Party Members & Individual Attendance</label>
+                  <label className="form-label">Party Members & +1 Slots</label>
                   {(editingGuest.members || []).map((m, idx) => (
                     <div
                       key={m.id || idx}
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: '2fr 1fr 2fr auto',
+                        gridTemplateColumns: 'auto 2fr 1fr 2fr auto',
                         gap: '0.6rem',
                         marginBottom: '0.5rem',
                         alignItems: 'center'
                       }}
                     >
+                      <span
+                        style={{
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          padding: '0.32rem 0.55rem',
+                          borderRadius: '6px',
+                          background: m.isPlusOne ? 'rgba(212, 168, 83, 0.2)' : 'var(--bg-secondary)',
+                          color: m.isPlusOne ? 'var(--accent-secondary)' : 'var(--text-muted)',
+                          border: m.isPlusOne ? '1px solid var(--border-gold)' : '1px solid var(--border-color)',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        {m.isPlusOne ? '+1 SLOT' : `GUEST #${idx + 1}`}
+                      </span>
                       <input
                         type="text"
                         className="form-input"
+                        placeholder={m.isPlusOne ? '+1 Name (Guest fills out on RSVP)' : 'Guest Full Name'}
                         value={m.name}
                         onChange={(e) => {
                           const next = [...editingGuest.members];
@@ -3637,9 +3782,11 @@ export default function CmsPortal({
                         type="button"
                         className="btn-danger"
                         onClick={() => {
+                          const updatedMembers = editingGuest.members.filter((_, i) => i !== idx);
                           setEditingGuest({
                             ...editingGuest,
-                            members: editingGuest.members.filter((_, i) => i !== idx)
+                            plusOnesAllowed: updatedMembers.filter((mem) => mem.isPlusOne).length,
+                            members: updatedMembers
                           });
                         }}
                       >
@@ -3647,22 +3794,47 @@ export default function CmsPortal({
                       </button>
                     </div>
                   ))}
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    style={{ alignSelf: 'flex-start', padding: '0.4rem 0.85rem', fontSize: '0.8rem' }}
-                    onClick={() =>
-                      setEditingGuest({
-                        ...editingGuest,
-                        members: [
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.4rem' }}>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      style={{ padding: '0.4rem 0.85rem', fontSize: '0.8rem' }}
+                      onClick={() =>
+                        setEditingGuest({
+                          ...editingGuest,
+                          members: [
+                            ...(editingGuest.members || []),
+                            { id: `m-${Date.now()}`, name: 'New Guest', isPlusOne: false, attending: null, mealChoice: '', dietary: '' }
+                          ]
+                        })
+                      }
+                    >
+                      <Plus size={14} /> Add Named Member
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      style={{
+                        padding: '0.4rem 0.85rem',
+                        fontSize: '0.8rem',
+                        borderColor: 'var(--border-gold)',
+                        color: 'var(--accent-secondary)'
+                      }}
+                      onClick={() => {
+                        const nextMembers = [
                           ...(editingGuest.members || []),
-                          { id: `m-${Date.now()}`, name: 'New Guest', attending: null, mealChoice: '', dietary: '' }
-                        ]
-                      })
-                    }
-                  >
-                    <Plus size={14} /> Add Member
-                  </button>
+                          { id: `plusone-${Date.now()}`, name: '', isPlusOne: true, attending: null, mealChoice: '', dietary: '' }
+                        ];
+                        setEditingGuest({
+                          ...editingGuest,
+                          plusOnesAllowed: nextMembers.filter((m) => m.isPlusOne).length,
+                          members: nextMembers
+                        });
+                      }}
+                    >
+                      <UserPlus size={14} /> Add a +1 Guest Slot
+                    </button>
+                  </div>
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
@@ -3734,6 +3906,45 @@ export default function CmsPortal({
                           • {guest.tableNumber}
                         </span>
                       )}
+
+                      {/* Quick +1 Selector Directly on the Guest Card */}
+                      <div
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
+                          background: 'var(--bg-accent-subtle)',
+                          border: '1px solid var(--border-gold)',
+                          borderRadius: '999px',
+                          padding: '0.15rem 0.6rem',
+                          fontSize: '0.74rem'
+                        }}
+                      >
+                        <UserPlus size={12} color="var(--accent-secondary)" />
+                        <span style={{ color: 'var(--accent-secondary)', fontWeight: 700 }}>+1 Option:</span>
+                        <select
+                          value={
+                            guest.plusOnesAllowed !== undefined
+                              ? guest.plusOnesAllowed
+                              : (guest.members || []).filter((m) => m.isPlusOne).length
+                          }
+                          onChange={(e) => handleQuickSetPlusOnes(guest, Number(e.target.value))}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: 'var(--text-primary)',
+                            fontWeight: 700,
+                            fontSize: '0.74rem',
+                            cursor: 'pointer',
+                            outline: 'none'
+                          }}
+                        >
+                          <option value={0} style={{ background: '#120b10' }}>No +1</option>
+                          <option value={1} style={{ background: '#120b10' }}>+1 Allowed</option>
+                          <option value={2} style={{ background: '#120b10' }}>+2 Allowed</option>
+                          <option value={3} style={{ background: '#120b10' }}>+3 Allowed</option>
+                        </select>
+                      </div>
                     </div>
 
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.65rem' }}>
@@ -3744,21 +3955,37 @@ export default function CmsPortal({
                             fontSize: '0.82rem',
                             padding: '0.3rem 0.7rem',
                             borderRadius: '8px',
-                            background: 'var(--bg-secondary)',
-                            border: '1px solid var(--border-color)',
+                            background: m.isPlusOne ? 'rgba(212, 168, 83, 0.12)' : 'var(--bg-secondary)',
+                            border: m.isPlusOne ? '1px solid var(--border-gold)' : '1px solid var(--border-color)',
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '0.4rem'
                           }}
                         >
-                          <strong>{m.name}</strong>
+                          {m.isPlusOne && (
+                            <span
+                              style={{
+                                fontSize: '0.68rem',
+                                fontWeight: 700,
+                                color: 'var(--accent-secondary)',
+                                textTransform: 'uppercase'
+                              }}
+                            >
+                              +1:
+                            </span>
+                          )}
+                          <strong>
+                            {m.name || (m.isPlusOne ? 'Guest Name TBD (Fills on RSVP)' : 'Unnamed Guest')}
+                          </strong>
                           {m.attending === true && (
                             <span style={{ color: '#34d399', fontWeight: 600 }}>
                               (Attending{m.mealChoice ? ` • ${m.mealChoice}` : ''})
                             </span>
                           )}
                           {m.attending === false && (
-                            <span style={{ color: '#f87171', fontWeight: 600 }}>(Declined)</span>
+                            <span style={{ color: '#f87171', fontWeight: 600 }}>
+                              ({m.isPlusOne ? 'Not Bringing +1' : 'Declined'})
+                            </span>
                           )}
                           {m.attending === null && (
                             <span style={{ color: 'var(--text-muted)' }}>(Pending)</span>
@@ -3880,7 +4107,9 @@ export default function CmsPortal({
                   </div>
                   <h4 style={{ fontSize: '1.45rem', marginBottom: '0.2rem' }}>{guest.householdName}</h4>
                   <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
-                    {(guest.members || []).map((m) => m.name).join(' • ')}
+                    {(guest.members || [])
+                      .map((m) => (m.isPlusOne ? m.name || '+1 Guest Invited' : m.name))
+                      .join(' • ')}
                   </p>
                   {qrImages[guest.code] && (
                     <img

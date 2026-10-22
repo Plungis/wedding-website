@@ -564,11 +564,12 @@ export const defaultDatabase = {
     {
       id: "guest-2",
       code: "OLIVE-7712",
-      householdName: "Dr. Maya Lin & Guest",
+      householdName: "Dr. Maya Lin & Plus One",
+      plusOnesAllowed: 1,
       email: "maya.lin@example.com",
       phone: "(206) 555-0149",
       tableNumber: "Table 5 • Nightshade",
-      personalNote: "Maya! From rainy bookstore coffee runs to an October manor wedding—we can't wait to dance with you!",
+      personalNote: "Maya! From rainy bookstore coffee runs to an October manor wedding—we reserved a +1 spot for you, so let us know who you'll be bringing!",
       rsvpStatus: "pending",
       respondedAt: null,
       dietaryNotes: "",
@@ -578,13 +579,15 @@ export const defaultDatabase = {
         {
           id: "m-201",
           name: "Dr. Maya Lin",
+          isPlusOne: false,
           attending: null,
           mealChoice: "",
           dietary: ""
         },
         {
           id: "m-202",
-          name: "Alex Rivera (Plus One)",
+          name: "",
+          isPlusOne: true,
           attending: null,
           mealChoice: "",
           dietary: ""
