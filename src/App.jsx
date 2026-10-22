@@ -17,7 +17,7 @@ import RsvpTab from './components/RsvpTab.jsx';
 import WeddingPartyTab from './components/WeddingPartyTab.jsx';
 import UnderConstructionView from './components/UnderConstructionView.jsx';
 import CmsPortal from './components/CmsPortal.jsx';
-import { renderDynamicIcon, GothicRoseArchOrnament } from './components/PageBlockRenderer.jsx';
+import { renderDynamicIcon, GothicRoseArchOrnament, RichText } from './components/PageBlockRenderer.jsx';
 
 const DEFAULT_BIG_TABS = [
   {
@@ -221,13 +221,20 @@ export default function App() {
       <div className="top-utility-bar no-print">
         <div className="top-utility-left">
           <span>
-            <strong>{siteSettings?.shortNames || 'Elena & Julian'}</strong>
-            {siteSettings?.topBarText !== '' ? ` • ${siteSettings?.topBarText || 'Wedding Celebration'}` : ''}
+            <strong><RichText text={siteSettings?.shortNames || 'Elena & Julian'} /></strong>
+            {siteSettings?.topBarText !== '' ? (
+              <>
+                {' • '}
+                <RichText text={siteSettings?.topBarText || 'Wedding Celebration'} />
+              </>
+            ) : (
+              ''
+            )}
           </span>
           {siteSettings?.hashtag && (
             <span style={{ opacity: 0.85, display: 'inline-flex', alignItems: 'center', gap: '0.2rem', color: 'var(--accent-secondary)' }}>
               <Hash size={13} />
-              {siteSettings.hashtag.replace(/^#/, '')}
+              <RichText text={siteSettings.hashtag.replace(/^#/, '')} />
             </span>
           )}
         </div>
@@ -272,23 +279,29 @@ export default function App() {
       >
         <div className="hero-gothic-arch-frame">
           <span className="hero-eyebrow">
-            {siteSettings?.heroEyebrow || '✦ Cathedral Roses & Twilight Vows • Till Death Do Us Party ✦'}
+            <RichText text={siteSettings?.heroEyebrow || '✦ Cathedral Roses & Twilight Vows • Till Death Do Us Party ✦'} />
           </span>
           <h1 className="hero-couple-names">
-            {siteSettings?.coupleNames || 'Elena Vance & Julian Sterling'}
+            <RichText text={siteSettings?.coupleNames || 'Elena Vance & Julian Sterling'} />
           </h1>
           <GothicRoseArchOrnament width={240} />
           <p className="hero-tagline">
-            {siteSettings?.heroTagline ||
-              'Beneath the stone cathedral archways and crimson baccara roses, we invite you to celebrate our union.'}
+            <RichText
+              text={
+                siteSettings?.heroTagline ||
+                'Beneath the stone cathedral archways and crimson baccara roses, we invite you to celebrate our union.'
+              }
+            />
           </p>
 
           <div className="hero-meta-pills">
             <span className="hero-pill">
-              <Calendar size={15} color="var(--accent-secondary)" /> {siteSettings?.weddingDateDisplay || 'Saturday, October 23, 2027'}
+              <Calendar size={15} color="var(--accent-secondary)" />{' '}
+              <RichText text={siteSettings?.weddingDateDisplay || 'Saturday, October 23, 2027'} />
             </span>
             <span className="hero-pill">
-              <MapPin size={15} color="var(--accent-secondary)" /> {siteSettings?.locationSummary || 'Tarrytown • Hudson Valley, NY'}
+              <MapPin size={15} color="var(--accent-secondary)" />{' '}
+              <RichText text={siteSettings?.locationSummary || 'Tarrytown • Hudson Valley, NY'} />
             </span>
           </div>
         </div>
@@ -315,12 +328,12 @@ export default function App() {
                   <div className="big-tab-icon-wrap">
                     {renderDynamicIcon(tab.icon || 'Heart', 22)}
                   </div>
-                  <span className="big-tab-step">{tab.step}</span>
+                  <span className="big-tab-step"><RichText text={tab.step} /></span>
                 </div>
 
                 <div>
-                  <div className="big-tab-title">{tab.title}</div>
-                  <div className="big-tab-subtitle">{tab.subtitle}</div>
+                  <div className="big-tab-title"><RichText text={tab.title} /></div>
+                  <div className="big-tab-subtitle"><RichText text={tab.subtitle} /></div>
                 </div>
 
                 <div className="big-tab-active-bar" />
@@ -396,14 +409,14 @@ export default function App() {
         <GothicRoseArchOrnament width={200} />
         {siteSettings?.footerText && (
           <div style={{ fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.16em', color: 'var(--accent-secondary)', marginBottom: '0.35rem' }}>
-            {siteSettings.footerText}
+            <RichText text={siteSettings.footerText} />
           </div>
         )}
         <div className="serif-font" style={{ fontSize: '2.1rem', marginBottom: '0.35rem' }}>
-          {siteSettings?.coupleNames}
+          <RichText text={siteSettings?.coupleNames} />
         </div>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1.15rem' }}>
-          {siteSettings?.weddingDateDisplay} • {siteSettings?.locationSummary}
+          <RichText text={siteSettings?.weddingDateDisplay} /> • <RichText text={siteSettings?.locationSummary} />
         </p>
         <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           <button className="btn-secondary" onClick={() => handleSelectTab('rsvp')}>

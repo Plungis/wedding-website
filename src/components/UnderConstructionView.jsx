@@ -9,7 +9,7 @@ import {
   Hash,
   Heart
 } from 'lucide-react';
-import { GothicRoseArchOrnament, PositionedImage } from './PageBlockRenderer.jsx';
+import { GothicRoseArchOrnament, PositionedImage, RichText } from './PageBlockRenderer.jsx';
 import RsvpTab from './RsvpTab.jsx';
 
 export default function UnderConstructionView({
@@ -175,7 +175,7 @@ export default function UnderConstructionView({
                 }}
               >
                 <Sparkles size={14} />
-                {uc.eyebrow || '✦ Save The Date • Full Wedding Website Unveiling Soon ✦'}
+                <RichText text={uc.eyebrow || '✦ Save The Date • Full Wedding Website Unveiling Soon ✦'} />
               </span>
             </div>
 
@@ -187,7 +187,7 @@ export default function UnderConstructionView({
                 marginBottom: '0.35rem'
               }}
             >
-              {siteSettings?.coupleNames || 'Elena Vance & Julian Sterling'}
+              <RichText text={siteSettings?.coupleNames || 'Elena Vance & Julian Sterling'} />
             </h1>
 
             <GothicRoseArchOrnament width={230} />
@@ -202,7 +202,7 @@ export default function UnderConstructionView({
                 marginBottom: '0.65rem'
               }}
             >
-              {uc.headline || 'Our Wedding Website Is Currently Under Construction'}
+              <RichText text={uc.headline || 'Our Wedding Website Is Currently Under Construction'} />
             </h2>
 
             <p
@@ -214,8 +214,12 @@ export default function UnderConstructionView({
                 lineHeight: 1.7
               }}
             >
-              {uc.subheadline ||
-                'We are busy putting the finishing touches on our ceremony details, candlelit reception menu, and travel guide. Save our date below and check back soon!'}
+              <RichText
+                text={
+                  uc.subheadline ||
+                  'We are busy putting the finishing touches on our ceremony details, candlelit reception menu, and travel guide. Save our date below and check back soon!'
+                }
+              />
             </p>
 
             {/* Date & Location Pills */}
@@ -223,11 +227,11 @@ export default function UnderConstructionView({
               <div className="hero-meta-pills" style={{ marginBottom: '2rem' }}>
                 <span className="hero-pill">
                   <Calendar size={15} color="var(--accent-secondary)" />{' '}
-                  {siteSettings?.weddingDateDisplay || 'Saturday, October 23, 2027'}
+                  <RichText text={siteSettings?.weddingDateDisplay || 'Saturday, October 23, 2027'} />
                 </span>
                 <span className="hero-pill">
                   <MapPin size={15} color="var(--accent-secondary)" />{' '}
-                  {siteSettings?.locationSummary || 'Tarrytown • Hudson Valley, NY'}
+                  <RichText text={siteSettings?.locationSummary || 'Tarrytown • Hudson Valley, NY'} />
                 </span>
               </div>
             )}
@@ -327,7 +331,7 @@ export default function UnderConstructionView({
                           className="role-badge"
                           style={{ marginBottom: '0.35rem', display: 'inline-block' }}
                         >
-                          {person.role}
+                          <RichText text={person.role} />
                         </span>
                       )}
                       <h3
@@ -338,7 +342,7 @@ export default function UnderConstructionView({
                           margin: 0
                         }}
                       >
-                        {person.name}
+                        <RichText text={person.name} />
                       </h3>
                     </div>
                   </div>
@@ -372,7 +376,7 @@ export default function UnderConstructionView({
                   fontStyle: 'italic'
                 }}
               >
-                {uc.footerNote}
+                <RichText text={uc.footerNote} />
               </p>
             )}
           </div>

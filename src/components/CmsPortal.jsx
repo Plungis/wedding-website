@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import QRCode from 'qrcode';
-import PageBlockRenderer, { GothicRoseArchOrnament } from './PageBlockRenderer.jsx';
+import PageBlockRenderer, {
+  GothicRoseArchOrnament,
+  RichText,
+  formatRichHtml,
+  stripHtmlToPlain
+} from './PageBlockRenderer.jsx';
 import UnderConstructionView from './UnderConstructionView.jsx';
 import { applyThemeAndCustomColors } from '../App.jsx';
 import {
@@ -759,6 +764,446 @@ function ImageFieldUploader({ label, value, cropValue, onChange, onCropChange })
             </button>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// RICH WYSIWYG EDITOR + 1-CLICK LINE BREAK COMPONENT FOR CMS TEXT BOXES
+// ============================================================================
+function triggerReactInputChange(el, nextValue) {
+  if (!el) return;
+  const proto =
+    el.tagName === 'TEXTAREA'
+      ? window.HTMLTextAreaElement.prototype
+      : window.HTMLInputElement.prototype;
+  const nativeSetter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+  if (nativeSetter) {
+    nativeSetter.call(el, nextValue);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+}
+
+function WysiwygEditor({
+  value = '',
+  onChange,
+  rows = 3,
+  placeholder = 'Type here... (Press Enter or click ↵ Line Break for a new line)',
+  compact = false,
+  style = {}
+}) {
+  const [mode, setMode] = useState('visual'); // 'visual' | 'source'
+  const editorRef = useRef(null);
+  const textareaRef = useRef(null);
+  const isFocusedRef = useRef(false);
+
+  // Sync external value into contentEditable when not actively typing inside it
+  useEffect(() => {
+    if (mode !== 'visual' || !editorRef.current) return;
+    const html = formatRichHtml(value || '');
+    if (!isFocusedRef.current && editorRef.current.innerHTML !== html) {
+      editorRef.current.innerHTML = html;
+    }
+  }, [value, mode]);
+
+  function emitVisualChange() {
+    if (!editorRef.current) return;
+    const rawHtml = editorRef.current.innerHTML;
+    const cleaned = rawHtml === '<br>' ? '' : rawHtml;
+    onChange(cleaned);
+  }
+
+  function runCommand(cmd, arg = null) {
+    if (mode === 'visual' && editorRef.current) {
+      editorRef.current.focus();
+      document.execCommand(cmd, false, arg);
+      emitVisualChange();
+      return;
+    }
+
+    // Source / Plain textarea fallback
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.focus();
+    const start = ta.selectionStart ?? (value || '').length;
+    const end = ta.selectionEnd ?? (value || '').length;
+    const str = String(value || '');
+    const selected = str.slice(start, end);
+    let replacement = selected;
+
+    if (cmd === 'insertLineBreak') {
+      replacement = `${selected}\n`;
+    } else if (cmd === 'bold') {
+      replacement = `<b>${selected || 'Bold Text'}</b>`;
+    } else if (cmd === 'italic') {
+      replacement = `<i>${selected || 'Italic Text'}</i>`;
+    } else if (cmd === 'underline') {
+      replacement = `<u>${selected || 'Underlined Text'}</u>`;
+    } else if (cmd === 'foreColor') {
+      replacement = `<span style="color: ${arg}">${selected || 'Colored Text'}</span>`;
+    } else if (cmd === 'fontSize') {
+      const sizeMap = { 2: '0.85em', 3: '1em', 5: '1.25em', 6: '1.55em' };
+      replacement = `<span style="font-size: ${sizeMap[arg] || '1.2em'}">${selected || 'Sized Text'}</span>`;
+    } else if (cmd === 'justifyLeft') {
+      replacement = `<div style="text-align: left">${selected || str}</div>`;
+      onChange(replacement);
+      return;
+    } else if (cmd === 'justifyCenter') {
+      replacement = `<div style="text-align: center">${selected || str}</div>`;
+      onChange(replacement);
+      return;
+    } else if (cmd === 'justifyRight') {
+      replacement = `<div style="text-align: right">${selected || str}</div>`;
+      onChange(replacement);
+      return;
+    } else if (cmd === 'insertUnorderedList') {
+      const lines = (selected || 'Item 1\nItem 2').split(/\r?\n/).filter(Boolean);
+      replacement = `<ul>${lines.map((l) => `<li>${l}</li>`).join('')}</ul>`;
+    } else if (cmd === 'insertText') {
+      replacement = `${selected}${arg || ''}`;
+    } else if (cmd === 'removeFormat') {
+      onChange(stripHtmlToPlain(str));
+      return;
+    }
+
+    const nextVal = str.slice(0, start) + replacement + str.slice(end);
+    onChange(nextVal);
+  }
+
+  const btnStyle = {
+    background: 'rgba(255, 255, 255, 0.06)',
+    border: '1px solid var(--border-color)',
+    color: 'var(--text-primary)',
+    borderRadius: '5px',
+    padding: compact ? '0.16rem 0.38rem' : '0.22rem 0.45rem',
+    fontSize: compact ? '0.68rem' : '0.72rem',
+    fontWeight: 700,
+    cursor: 'pointer',
+    lineHeight: 1.2,
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '0.2rem'
+  };
+
+  const minHeightPx = compact ? 42 : Math.max(58, rows * 24);
+
+  return (
+    <div
+      className="wysiwyg-editor-shell"
+      style={{
+        border: '1px solid var(--border-color)',
+        borderRadius: '10px',
+        background: 'var(--bg-primary)',
+        overflow: 'hidden',
+        ...style
+      }}
+    >
+      {/* WYSIWYG Formatting & Line-Break Toolbar */}
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: '0.25rem',
+          padding: compact ? '0.28rem 0.45rem' : '0.35rem 0.55rem',
+          background: '#080508',
+          borderBottom: '1px solid var(--border-color)'
+        }}
+      >
+        <button
+          type="button"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            setMode(mode === 'visual' ? 'source' : 'visual');
+          }}
+          style={{
+            ...btnStyle,
+            background: mode === 'visual' ? 'rgba(158, 27, 50, 0.38)' : 'rgba(255,255,255,0.08)',
+            borderColor: 'var(--border-gold)',
+            color: 'var(--accent-secondary)'
+          }}
+          title="Switch between Visual WYSIWYG Editor and Raw Text/HTML mode"
+        >
+          {mode === 'visual' ? '✨ Visual' : '</> Text'}
+        </button>
+
+        <button
+          type="button"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            runCommand('insertLineBreak');
+          }}
+          style={{
+            ...btnStyle,
+            background: 'rgba(212, 168, 83, 0.2)',
+            borderColor: 'var(--border-gold)',
+            color: 'var(--accent-secondary)'
+          }}
+          title="Insert a Line Break (or press Enter inside the box)"
+        >
+          ↵ Line Break
+        </button>
+
+        <button
+          type="button"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            runCommand('bold');
+          }}
+          style={{ ...btnStyle, fontWeight: 900 }}
+          title="Bold (Ctrl+B)"
+        >
+          B
+        </button>
+
+        <button
+          type="button"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            runCommand('italic');
+          }}
+          style={{ ...btnStyle, fontStyle: 'italic', fontFamily: 'Georgia, serif' }}
+          title="Italic (Ctrl+I)"
+        >
+          I
+        </button>
+
+        <button
+          type="button"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            runCommand('underline');
+          }}
+          style={{ ...btnStyle, textDecoration: 'underline' }}
+          title="Underline (Ctrl+U)"
+        >
+          U
+        </button>
+
+        {/* Color Swatches */}
+        <button
+          type="button"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            runCommand('foreColor', '#d4a853');
+          }}
+          style={{ ...btnStyle, color: '#d4a853', borderColor: 'rgba(212,168,83,0.45)' }}
+          title="Gold Filigree Text Color"
+        >
+          ● Gold
+        </button>
+
+        <button
+          type="button"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            runCommand('foreColor', '#e11d48');
+          }}
+          style={{ ...btnStyle, color: '#fb7185', borderColor: 'rgba(225,29,72,0.45)' }}
+          title="Crimson Rose Text Color"
+        >
+          ● Rose
+        </button>
+
+        <button
+          type="button"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            runCommand('foreColor', '#f5eee6');
+          }}
+          style={{ ...btnStyle, color: '#f5eee6' }}
+          title="Alabaster Ivory Text Color"
+        >
+          ● Ivory
+        </button>
+
+        {!compact && (
+          <>
+            {/* Text Size */}
+            <button
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                runCommand('fontSize', '2');
+              }}
+              style={btnStyle}
+              title="Small Text Size"
+            >
+              S
+            </button>
+            <button
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                runCommand('fontSize', '3');
+              }}
+              style={btnStyle}
+              title="Normal Text Size"
+            >
+              M
+            </button>
+            <button
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                runCommand('fontSize', '5');
+              }}
+              style={btnStyle}
+              title="Large Text Size"
+            >
+              L
+            </button>
+            <button
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                runCommand('fontSize', '6');
+              }}
+              style={btnStyle}
+              title="Extra Large Text Size"
+            >
+              XL
+            </button>
+
+            {/* Alignment */}
+            <button
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                runCommand('justifyLeft');
+              }}
+              style={btnStyle}
+              title="Align Left"
+            >
+              ⬅
+            </button>
+            <button
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                runCommand('justifyCenter');
+              }}
+              style={btnStyle}
+              title="Align Center"
+            >
+              ⬌
+            </button>
+            <button
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                runCommand('justifyRight');
+              }}
+              style={btnStyle}
+              title="Align Right"
+            >
+              ➡
+            </button>
+
+            {/* Bullet List & Gothic Ornaments */}
+            <button
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                runCommand('insertUnorderedList');
+              }}
+              style={btnStyle}
+              title="Bullet List"
+            >
+              • List
+            </button>
+          </>
+        )}
+
+        <button
+          type="button"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            runCommand('insertText', '✦');
+          }}
+          style={btnStyle}
+          title="Insert Gothic Star ✦"
+        >
+          ✦
+        </button>
+
+        <button
+          type="button"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            runCommand('insertText', '🌹');
+          }}
+          style={btnStyle}
+          title="Insert Rose 🌹"
+        >
+          🌹
+        </button>
+
+        <button
+          type="button"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            runCommand('removeFormat');
+          }}
+          style={{ ...btnStyle, color: 'var(--text-muted)' }}
+          title="Clear Formatting"
+        >
+          Clear
+        </button>
+      </div>
+
+      {/* Editable Area */}
+      {mode === 'visual' ? (
+        <div
+          ref={editorRef}
+          contentEditable
+          suppressContentEditableWarning
+          data-placeholder={placeholder}
+          onFocus={() => {
+            isFocusedRef.current = true;
+          }}
+          onBlur={() => {
+            isFocusedRef.current = false;
+            emitVisualChange();
+          }}
+          onInput={emitVisualChange}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              document.execCommand('insertLineBreak');
+              emitVisualChange();
+            }
+          }}
+          style={{
+            minHeight: `${minHeightPx}px`,
+            padding: compact ? '0.45rem 0.65rem' : '0.6rem 0.75rem',
+            fontSize: compact ? '0.84rem' : '0.88rem',
+            lineHeight: 1.55,
+            color: 'var(--text-primary)',
+            outline: 'none',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+            cursor: 'text'
+          }}
+        />
+      ) : (
+        <textarea
+          ref={textareaRef}
+          rows={compact ? 2 : rows}
+          className="form-textarea"
+          placeholder={placeholder}
+          value={value || ''}
+          onChange={(e) => onChange(e.target.value)}
+          style={{
+            border: 'none',
+            borderRadius: 0,
+            minHeight: `${minHeightPx}px`,
+            padding: compact ? '0.45rem 0.65rem' : '0.6rem 0.75rem',
+            fontSize: compact ? '0.82rem' : '0.86rem',
+            background: 'transparent'
+          }}
+        />
       )}
     </div>
   );
@@ -1587,12 +2032,12 @@ export default function CmsPortal({
                     onCropChange={(c) => updateItem(idx, 'photoCrop', c)}
                   />
                   <div className="form-group">
-                    <label className="form-label">Bio</label>
-                    <textarea rows={3} className="form-textarea" value={item.bio || ''} onChange={(e) => updateItem(idx, 'bio', e.target.value)} />
+                    <label className="form-label">Bio (WYSIWYG & Line Breaks)</label>
+                    <WysiwygEditor rows={3} value={item.bio || ''} onChange={(val) => updateItem(idx, 'bio', val)} />
                   </div>
                   <div className="form-group">
                     <label className="form-label">Fun Fact</label>
-                    <input type="text" className="form-input" value={item.funFact || ''} onChange={(e) => updateItem(idx, 'funFact', e.target.value)} />
+                    <WysiwygEditor compact value={item.funFact || ''} onChange={(val) => updateItem(idx, 'funFact', val)} />
                   </div>
                 </>
               )}
@@ -1629,7 +2074,7 @@ export default function CmsPortal({
                   </div>
                   <div className="form-group">
                     <label className="form-label">Milestone Title</label>
-                    <input type="text" className="form-input" value={item.title || ''} onChange={(e) => updateItem(idx, 'title', e.target.value)} />
+                    <WysiwygEditor compact value={item.title || ''} onChange={(val) => updateItem(idx, 'title', val)} />
                   </div>
                   <ImageFieldUploader
                     label="Milestone Photo"
@@ -1639,8 +2084,8 @@ export default function CmsPortal({
                     onCropChange={(c) => updateItem(idx, 'imageCrop', c)}
                   />
                   <div className="form-group">
-                    <label className="form-label">Story Description</label>
-                    <textarea rows={2} className="form-textarea" value={item.description || ''} onChange={(e) => updateItem(idx, 'description', e.target.value)} />
+                    <label className="form-label">Story Description (WYSIWYG & Line Breaks)</label>
+                    <WysiwygEditor rows={3} value={item.description || ''} onChange={(val) => updateItem(idx, 'description', val)} />
                   </div>
                 </>
               )}
@@ -1669,8 +2114,8 @@ export default function CmsPortal({
                     onCropChange={(c) => updateItem(idx, 'photoCrop', c)}
                   />
                   <div className="form-group">
-                    <label className="form-label">Bio</label>
-                    <textarea rows={2} className="form-textarea" value={item.bio || ''} onChange={(e) => updateItem(idx, 'bio', e.target.value)} />
+                    <label className="form-label">Bio (WYSIWYG & Line Breaks)</label>
+                    <WysiwygEditor rows={2} value={item.bio || ''} onChange={(val) => updateItem(idx, 'bio', val)} />
                   </div>
                 </>
               )}
@@ -1685,8 +2130,8 @@ export default function CmsPortal({
                     onCropChange={(c) => updateItem(idx, 'urlCrop', c)}
                   />
                   <div className="form-group">
-                    <label className="form-label">Caption</label>
-                    <input type="text" className="form-input" value={item.caption || ''} onChange={(e) => updateItem(idx, 'caption', e.target.value)} />
+                    <label className="form-label">Caption (WYSIWYG & Line Breaks)</label>
+                    <WysiwygEditor compact value={item.caption || ''} onChange={(val) => updateItem(idx, 'caption', val)} />
                   </div>
                 </>
               )}
@@ -1699,11 +2144,11 @@ export default function CmsPortal({
                   </div>
                   <div className="form-group">
                     <label className="form-label">Event Title</label>
-                    <input type="text" className="form-input" value={item.title || ''} onChange={(e) => updateItem(idx, 'title', e.target.value)} />
+                    <WysiwygEditor compact value={item.title || ''} onChange={(val) => updateItem(idx, 'title', val)} />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Description</label>
-                    <textarea rows={2} className="form-textarea" value={item.description || item.detail || ''} onChange={(e) => updateItem(idx, 'description', e.target.value)} />
+                    <label className="form-label">Description (WYSIWYG & Line Breaks)</label>
+                    <WysiwygEditor rows={2} value={item.description || item.detail || ''} onChange={(val) => updateItem(idx, 'description', val)} />
                   </div>
                 </>
               )}
@@ -1726,11 +2171,11 @@ export default function CmsPortal({
                   </div>
                   <div className="form-group">
                     <label className="form-label">Card Headline</label>
-                    <input type="text" className="form-input" value={item.title || ''} onChange={(e) => updateItem(idx, 'title', e.target.value)} />
+                    <WysiwygEditor compact value={item.title || ''} onChange={(val) => updateItem(idx, 'title', val)} />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Card Text</label>
-                    <textarea rows={3} className="form-textarea" value={item.description || ''} onChange={(e) => updateItem(idx, 'description', e.target.value)} />
+                    <label className="form-label">Card Text (WYSIWYG & Line Breaks)</label>
+                    <WysiwygEditor rows={3} value={item.description || ''} onChange={(val) => updateItem(idx, 'description', val)} />
                   </div>
                 </>
               )}
@@ -1746,8 +2191,8 @@ export default function CmsPortal({
                     <input type="text" className="form-input" value={item.tag || ''} onChange={(e) => updateItem(idx, 'tag', e.target.value)} />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Dish Description</label>
-                    <textarea rows={2} className="form-textarea" value={item.description || ''} onChange={(e) => updateItem(idx, 'description', e.target.value)} />
+                    <label className="form-label">Dish Description (WYSIWYG & Line Breaks)</label>
+                    <WysiwygEditor rows={2} value={item.description || ''} onChange={(val) => updateItem(idx, 'description', val)} />
                   </div>
                 </>
               )}
@@ -1760,11 +2205,11 @@ export default function CmsPortal({
                   </div>
                   <div className="form-group">
                     <label className="form-label">Event Title</label>
-                    <input type="text" className="form-input" value={item.title || ''} onChange={(e) => updateItem(idx, 'title', e.target.value)} />
+                    <WysiwygEditor compact value={item.title || ''} onChange={(val) => updateItem(idx, 'title', val)} />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Description</label>
-                    <textarea rows={2} className="form-textarea" value={item.description || ''} onChange={(e) => updateItem(idx, 'description', e.target.value)} />
+                    <label className="form-label">Description (WYSIWYG & Line Breaks)</label>
+                    <WysiwygEditor rows={2} value={item.description || ''} onChange={(val) => updateItem(idx, 'description', val)} />
                   </div>
                 </>
               )}
@@ -1773,7 +2218,7 @@ export default function CmsPortal({
                 <>
                   <div className="form-group">
                     <label className="form-label">Hotel Name</label>
-                    <input type="text" className="form-input" value={item.name || ''} onChange={(e) => updateItem(idx, 'name', e.target.value)} />
+                    <WysiwygEditor compact value={item.name || ''} onChange={(val) => updateItem(idx, 'name', val)} />
                   </div>
                   <div className="grid-2" style={{ gap: '0.6rem' }}>
                     <div className="form-group">
@@ -1796,8 +2241,8 @@ export default function CmsPortal({
                     </div>
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Notes</label>
-                    <textarea rows={2} className="form-textarea" value={item.notes || ''} onChange={(e) => updateItem(idx, 'notes', e.target.value)} />
+                    <label className="form-label">Notes (WYSIWYG & Line Breaks)</label>
+                    <WysiwygEditor rows={2} value={item.notes || ''} onChange={(val) => updateItem(idx, 'notes', val)} />
                   </div>
                 </>
               )}
@@ -1806,11 +2251,11 @@ export default function CmsPortal({
                 <>
                   <div className="form-group">
                     <label className="form-label">Question</label>
-                    <input type="text" className="form-input" value={item.question || ''} onChange={(e) => updateItem(idx, 'question', e.target.value)} />
+                    <WysiwygEditor compact value={item.question || ''} onChange={(val) => updateItem(idx, 'question', val)} />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Answer</label>
-                    <textarea rows={3} className="form-textarea" value={item.answer || ''} onChange={(e) => updateItem(idx, 'answer', e.target.value)} />
+                    <label className="form-label">Answer (WYSIWYG & Line Breaks)</label>
+                    <WysiwygEditor rows={3} value={item.answer || ''} onChange={(val) => updateItem(idx, 'answer', val)} />
                   </div>
                 </>
               )}
@@ -2095,6 +2540,98 @@ export default function CmsPortal({
           </div>
         </header>
 
+        {/* UNIVERSAL QUICK WYSIWYG & LINE BREAK HELPER BAR (WORKS FOR ANY FOCUSED INPUT OR WYSIWYG BOX) */}
+        <div
+          style={{
+            background: '#0c080c',
+            borderBottom: '1px solid var(--border-gold)',
+            padding: '0.32rem 1.25rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '0.5rem',
+            fontSize: '0.73rem'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+            <span style={{ color: 'var(--accent-secondary)', fontWeight: 700 }}>
+              ✨ WYSIWYG & Line Break Bar:
+            </span>
+            <span style={{ color: 'var(--text-secondary)' }}>
+              Every multi-line editor has a built-in Visual WYSIWYG toolbar (or press <strong>Enter</strong> for a new line). For any single-line input box you click into, use these 1-click buttons:
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.28rem', flexWrap: 'wrap' }}>
+            {[
+              { label: '↵ Line Break', snippet: '<br />', accent: true, title: 'Insert a line break at cursor in any text input' },
+              { label: 'B', wrap: ['<strong>', '</strong>'], bold: true, title: 'Wrap selected text in Bold' },
+              { label: 'I', wrap: ['<em>', '</em>'], italic: true, title: 'Wrap selected text in Italic' },
+              { label: 'U', wrap: ['<u>', '</u>'], underline: true, title: 'Wrap selected text in Underline' },
+              { label: '● Gold', wrap: ['<span style="color: var(--accent-secondary)">', '</span>'], color: '#d4a853', title: 'Gold text color' },
+              { label: '● Rose', wrap: ['<span style="color: #e63956">', '</span>'], color: '#e63956', title: 'Crimson rose text color' },
+              { label: '✦', snippet: ' ✦ ', title: 'Insert Gothic star ornament' },
+              { label: '🌹', snippet: ' 🌹 ', title: 'Insert Gothic rose' }
+            ].map((btn, bIdx) => (
+              <button
+                key={bIdx}
+                type="button"
+                title={btn.title}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  const el = document.activeElement;
+                  if (!el) return;
+                  if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+                    const start = el.selectionStart ?? el.value.length;
+                    const end = el.selectionEnd ?? el.value.length;
+                    const selected = el.value.slice(start, end);
+                    const replacement = btn.wrap
+                      ? `${btn.wrap[0]}${selected || 'Text'}${btn.wrap[1]}`
+                      : btn.snippet;
+                    const nextVal = el.value.slice(0, start) + replacement + el.value.slice(end);
+                    triggerReactInputChange(el, nextVal);
+                    requestAnimationFrame(() => {
+                      el.focus();
+                      const pos = start + replacement.length;
+                      try {
+                        el.setSelectionRange(pos, pos);
+                      } catch {
+                        // ignore on inputs that don't support selectionRange
+                      }
+                    });
+                  } else if (el.isContentEditable) {
+                    if (btn.snippet === '<br />') {
+                      document.execCommand('insertHTML', false, '<br><br>');
+                    } else if (btn.label === 'B') {
+                      document.execCommand('bold', false, null);
+                    } else if (btn.label === 'I') {
+                      document.execCommand('italic', false, null);
+                    } else if (btn.label === 'U') {
+                      document.execCommand('underline', false, null);
+                    } else if (btn.snippet) {
+                      document.execCommand('insertText', false, btn.snippet);
+                    }
+                  }
+                }}
+                style={{
+                  background: btn.accent ? 'rgba(212, 168, 83, 0.22)' : 'rgba(255,255,255,0.05)',
+                  border: btn.accent ? '1px solid var(--border-gold)' : '1px solid var(--border-color)',
+                  color: btn.color || (btn.accent ? 'var(--accent-secondary)' : 'var(--text-primary)'),
+                  borderRadius: '6px',
+                  padding: '0.18rem 0.48rem',
+                  fontSize: '0.71rem',
+                  fontWeight: btn.bold || btn.accent ? 800 : 600,
+                  fontStyle: btn.italic ? 'italic' : 'normal',
+                  textDecoration: btn.underline ? 'underline' : 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                {btn.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* ================================================================= */}
         {/* MODE: SEARCH & EDIT ALL SITE TEXT (MASTER TEXT EDITOR)            */}
         {/* ================================================================= */}
@@ -2178,33 +2715,18 @@ export default function CmsPortal({
                       {heroFields.map((f) => (
                         <div key={f.key} className="form-group" style={{ gridColumn: f.multiline ? '1 / -1' : 'auto', marginBottom: 0 }}>
                           <label className="form-label">{f.label}</label>
-                          {f.multiline ? (
-                            <textarea
-                              rows={2}
-                              className="form-textarea"
-                              value={cmsDb.siteSettings?.[f.key] ?? ''}
-                              onChange={(e) => {
-                                setHasUnsavedChanges(true);
-                                setCmsDb({
-                                  ...cmsDb,
-                                  siteSettings: { ...cmsDb.siteSettings, [f.key]: e.target.value }
-                                });
-                              }}
-                            />
-                          ) : (
-                            <input
-                              type="text"
-                              className="form-input"
-                              value={cmsDb.siteSettings?.[f.key] ?? ''}
-                              onChange={(e) => {
-                                setHasUnsavedChanges(true);
-                                setCmsDb({
-                                  ...cmsDb,
-                                  siteSettings: { ...cmsDb.siteSettings, [f.key]: e.target.value }
-                                });
-                              }}
-                            />
-                          )}
+                          <WysiwygEditor
+                            compact={!f.multiline}
+                            rows={f.multiline ? 2 : 1}
+                            value={cmsDb.siteSettings?.[f.key] ?? ''}
+                            onChange={(val) => {
+                              setHasUnsavedChanges(true);
+                              setCmsDb({
+                                ...cmsDb,
+                                siteSettings: { ...cmsDb.siteSettings, [f.key]: val }
+                              });
+                            }}
+                          />
                         </div>
                       ))}
                     </div>
@@ -2248,47 +2770,42 @@ export default function CmsPortal({
                       <div className="grid-2" style={{ gap: '0.65rem' }}>
                         <div className="form-group" style={{ marginBottom: 0 }}>
                           <label className="form-label">Page Main Title / Headline</label>
-                          <input
-                            type="text"
-                            className="form-input"
+                          <WysiwygEditor
+                            compact
                             value={pageObj.headline || ''}
-                            onChange={(e) => updatePageField(pg.key, 'headline', e.target.value)}
+                            onChange={(val) => updatePageField(pg.key, 'headline', val)}
                           />
                         </div>
                         <div className="form-group" style={{ marginBottom: 0 }}>
                           <label className="form-label">Page Top Eyebrow / Kicker</label>
-                          <input
-                            type="text"
-                            className="form-input"
+                          <WysiwygEditor
+                            compact
                             value={pageObj.kicker || ''}
-                            onChange={(e) => updatePageField(pg.key, 'kicker', e.target.value)}
+                            onChange={(val) => updatePageField(pg.key, 'kicker', val)}
                           />
                         </div>
                         <div className="form-group" style={{ gridColumn: '1 / -1', marginBottom: 0 }}>
-                          <label className="form-label">Page Intro Subtitle</label>
-                          <textarea
+                          <label className="form-label">Page Intro Subtitle (WYSIWYG & Line Breaks)</label>
+                          <WysiwygEditor
                             rows={2}
-                            className="form-textarea"
                             value={pageObj.subheadline || ''}
-                            onChange={(e) => updatePageField(pg.key, 'subheadline', e.target.value)}
+                            onChange={(val) => updatePageField(pg.key, 'subheadline', val)}
                           />
                         </div>
                         <div className="form-group" style={{ marginBottom: 0 }}>
                           <label className="form-label">Bottom Banner Title (if enabled)</label>
-                          <input
-                            type="text"
-                            className="form-input"
+                          <WysiwygEditor
+                            compact
                             value={pageObj.bottomBannerTitle ?? 'Join Us Under the October Moon'}
-                            onChange={(e) => updatePageField(pg.key, 'bottomBannerTitle', e.target.value)}
+                            onChange={(val) => updatePageField(pg.key, 'bottomBannerTitle', val)}
                           />
                         </div>
                         <div className="form-group" style={{ marginBottom: 0 }}>
                           <label className="form-label">Bottom Banner Subtitle</label>
-                          <input
-                            type="text"
-                            className="form-input"
+                          <WysiwygEditor
+                            compact
                             value={pageObj.bottomBannerSubtitle ?? ''}
-                            onChange={(e) => updatePageField(pg.key, 'bottomBannerSubtitle', e.target.value)}
+                            onChange={(val) => updatePageField(pg.key, 'bottomBannerSubtitle', val)}
                           />
                         </div>
                       </div>
@@ -2502,32 +3019,32 @@ export default function CmsPortal({
                                     )}
                                     {'bio' in item && (
                                       <div className="form-group" style={{ gridColumn: '1 / -1', marginBottom: 0 }}>
-                                        <label className="form-label">Bio</label>
-                                        <input type="text" className="form-input" value={item.bio || ''} onChange={(e) => updateItemInPage('bio', e.target.value)} />
+                                        <label className="form-label">Bio (WYSIWYG & Line Breaks)</label>
+                                        <WysiwygEditor rows={2} value={item.bio || ''} onChange={(val) => updateItemInPage('bio', val)} />
                                       </div>
                                     )}
                                     {'funFact' in item && (
                                       <div className="form-group" style={{ gridColumn: '1 / -1', marginBottom: 0 }}>
                                         <label className="form-label">Fun Fact</label>
-                                        <input type="text" className="form-input" value={item.funFact || ''} onChange={(e) => updateItemInPage('funFact', e.target.value)} />
+                                        <WysiwygEditor compact value={item.funFact || ''} onChange={(val) => updateItemInPage('funFact', val)} />
                                       </div>
                                     )}
                                     {'description' in item && (
                                       <div className="form-group" style={{ gridColumn: '1 / -1', marginBottom: 0 }}>
-                                        <label className="form-label">Description</label>
-                                        <input type="text" className="form-input" value={item.description || ''} onChange={(e) => updateItemInPage('description', e.target.value)} />
+                                        <label className="form-label">Description (WYSIWYG & Line Breaks)</label>
+                                        <WysiwygEditor rows={2} value={item.description || ''} onChange={(val) => updateItemInPage('description', val)} />
                                       </div>
                                     )}
                                     {'answer' in item && (
                                       <div className="form-group" style={{ gridColumn: '1 / -1', marginBottom: 0 }}>
-                                        <label className="form-label">Answer</label>
-                                        <input type="text" className="form-input" value={item.answer || ''} onChange={(e) => updateItemInPage('answer', e.target.value)} />
+                                        <label className="form-label">Answer (WYSIWYG & Line Breaks)</label>
+                                        <WysiwygEditor rows={2} value={item.answer || ''} onChange={(val) => updateItemInPage('answer', val)} />
                                       </div>
                                     )}
                                     {'caption' in item && (
                                       <div className="form-group" style={{ gridColumn: '1 / -1', marginBottom: 0 }}>
                                         <label className="form-label">Photo Caption</label>
-                                        <input type="text" className="form-input" value={item.caption || ''} onChange={(e) => updateItemInPage('caption', e.target.value)} />
+                                        <WysiwygEditor compact value={item.caption || ''} onChange={(val) => updateItemInPage('caption', val)} />
                                       </div>
                                     )}
                                   </div>
@@ -2908,18 +3425,16 @@ export default function CmsPortal({
                   <label style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '0.18rem' }}>
                     Hero Tagline / Moon Quote Under Names
                   </label>
-                  <textarea
+                  <WysiwygEditor
                     rows={2}
-                    className="form-textarea"
                     value={cmsDb.siteSettings?.heroTagline || ''}
-                    onChange={(e) => {
+                    onChange={(val) => {
                       setHasUnsavedChanges(true);
                       setCmsDb({
                         ...cmsDb,
-                        siteSettings: { ...cmsDb.siteSettings, heroTagline: e.target.value }
+                        siteSettings: { ...cmsDb.siteSettings, heroTagline: val }
                       });
                     }}
-                    style={{ padding: '0.45rem 0.65rem', fontSize: '0.78rem' }}
                   />
                 </div>
               </div>
@@ -3073,13 +3588,11 @@ export default function CmsPortal({
                       onChange={(e) => updatePageField(builderPage, 'divider', e.target.value)}
                       style={{ marginBottom: '0.45rem', padding: '0.45rem 0.65rem', fontSize: '0.8rem' }}
                     />
-                    <textarea
+                    <WysiwygEditor
                       rows={2}
-                      className="form-textarea"
                       placeholder="Page Subheadline"
                       value={currentPageObj.subheadline || ''}
-                      onChange={(e) => updatePageField(builderPage, 'subheadline', e.target.value)}
-                      style={{ padding: '0.48rem 0.7rem', fontSize: '0.8rem' }}
+                      onChange={(val) => updatePageField(builderPage, 'subheadline', val)}
                     />
                   </div>
 
@@ -3415,18 +3928,18 @@ export default function CmsPortal({
                       }}
                     >
                       <div className="hero-gothic-arch-frame">
-                        <span className="hero-eyebrow">{cmsDb.siteSettings?.heroEyebrow}</span>
+                        <span className="hero-eyebrow"><RichText text={cmsDb.siteSettings?.heroEyebrow} /></span>
                         <h1 className="hero-couple-names" style={{ fontSize: '2.35rem' }}>
-                          {cmsDb.siteSettings?.coupleNames}
+                          <RichText text={cmsDb.siteSettings?.coupleNames} />
                         </h1>
                         <GothicRoseArchOrnament width={180} />
-                        <p className="hero-tagline">{cmsDb.siteSettings?.heroTagline}</p>
+                        <p className="hero-tagline"><RichText text={cmsDb.siteSettings?.heroTagline} /></p>
                         <div className="hero-meta-pills">
                           <span className="hero-pill">
-                            <Calendar size={14} color="var(--accent-secondary)" /> {cmsDb.siteSettings?.weddingDateDisplay}
+                            <Calendar size={14} color="var(--accent-secondary)" /> <RichText text={cmsDb.siteSettings?.weddingDateDisplay} />
                           </span>
                           <span className="hero-pill">
-                            <MapPin size={14} color="var(--accent-secondary)" /> {cmsDb.siteSettings?.locationSummary}
+                            <MapPin size={14} color="var(--accent-secondary)" /> <RichText text={cmsDb.siteSettings?.locationSummary} />
                           </span>
                         </div>
                       </div>
@@ -3457,11 +3970,11 @@ export default function CmsPortal({
                             }}
                           >
                             <div className="big-tab-top">
-                              <span className="big-tab-step" style={{ fontSize: '0.65rem' }}>{tab.step}</span>
+                              <span className="big-tab-step" style={{ fontSize: '0.65rem' }}><RichText text={tab.step} /></span>
                             </div>
                             <div>
-                              <div className="big-tab-title" style={{ fontSize: '1.05rem' }}>{tab.title}</div>
-                              <div className="big-tab-subtitle" style={{ fontSize: '0.72rem' }}>{tab.subtitle}</div>
+                              <div className="big-tab-title" style={{ fontSize: '1.05rem' }}><RichText text={tab.title} /></div>
+                              <div className="big-tab-subtitle" style={{ fontSize: '0.72rem' }}><RichText text={tab.subtitle} /></div>
                             </div>
                           </div>
                         );
@@ -3539,15 +4052,15 @@ export default function CmsPortal({
 
                   <div className="form-group">
                     <label className="form-label">Couple Full Names (Displayed at Top)</label>
-                    <input
-                      type="text"
-                      className="form-input"
+                    <WysiwygEditor
+                      compact
+                      rows={1}
                       value={cmsDb.siteSettings?.coupleNames || ''}
-                      onChange={(e) => {
+                      onChange={(val) => {
                         setHasUnsavedChanges(true);
                         setCmsDb({
                           ...cmsDb,
-                          siteSettings: { ...cmsDb.siteSettings, coupleNames: e.target.value }
+                          siteSettings: { ...cmsDb.siteSettings, coupleNames: val }
                         });
                       }}
                     />
@@ -3555,11 +4068,11 @@ export default function CmsPortal({
 
                   <div className="form-group">
                     <label className="form-label">Top Eyebrow Badge</label>
-                    <input
-                      type="text"
-                      className="form-input"
+                    <WysiwygEditor
+                      compact
+                      rows={1}
                       value={cmsDb.siteSettings?.underConstruction?.eyebrow ?? '✦ Save The Date • Full Wedding Website Unveiling Soon ✦'}
-                      onChange={(e) => {
+                      onChange={(val) => {
                         setHasUnsavedChanges(true);
                         setCmsDb({
                           ...cmsDb,
@@ -3567,7 +4080,7 @@ export default function CmsPortal({
                             ...cmsDb.siteSettings,
                             underConstruction: {
                               ...(cmsDb.siteSettings?.underConstruction || {}),
-                              eyebrow: e.target.value
+                              eyebrow: val
                             }
                           }
                         });
@@ -3577,11 +4090,11 @@ export default function CmsPortal({
 
                   <div className="form-group">
                     <label className="form-label">Under Construction Headline</label>
-                    <input
-                      type="text"
-                      className="form-input"
+                    <WysiwygEditor
+                      compact
+                      rows={1}
                       value={cmsDb.siteSettings?.underConstruction?.headline ?? 'Our Wedding Website Is Currently Under Construction'}
-                      onChange={(e) => {
+                      onChange={(val) => {
                         setHasUnsavedChanges(true);
                         setCmsDb({
                           ...cmsDb,
@@ -3589,7 +4102,7 @@ export default function CmsPortal({
                             ...cmsDb.siteSettings,
                             underConstruction: {
                               ...(cmsDb.siteSettings?.underConstruction || {}),
-                              headline: e.target.value
+                              headline: val
                             }
                           }
                         });
@@ -3599,14 +4112,13 @@ export default function CmsPortal({
 
                   <div className="form-group">
                     <label className="form-label">Under Construction Message / Subheadline</label>
-                    <textarea
+                    <WysiwygEditor
                       rows={3}
-                      className="form-textarea"
                       value={
                         cmsDb.siteSettings?.underConstruction?.subheadline ??
                         'We are busy putting the finishing touches on our ceremony details, candlelit reception menu, and travel guide. Save our date below and check back soon!'
                       }
-                      onChange={(e) => {
+                      onChange={(val) => {
                         setHasUnsavedChanges(true);
                         setCmsDb({
                           ...cmsDb,
@@ -3614,7 +4126,7 @@ export default function CmsPortal({
                             ...cmsDb.siteSettings,
                             underConstruction: {
                               ...(cmsDb.siteSettings?.underConstruction || {}),
-                              subheadline: e.target.value
+                              subheadline: val
                             }
                           }
                         });
@@ -3624,11 +4136,11 @@ export default function CmsPortal({
 
                   <div className="form-group">
                     <label className="form-label">Bottom Footer Note</label>
-                    <input
-                      type="text"
-                      className="form-input"
+                    <WysiwygEditor
+                      compact
+                      rows={1}
                       value={cmsDb.siteSettings?.underConstruction?.footerNote ?? 'Questions in the meantime? Reach out to us directly!'}
-                      onChange={(e) => {
+                      onChange={(val) => {
                         setHasUnsavedChanges(true);
                         setCmsDb({
                           ...cmsDb,
@@ -3636,7 +4148,7 @@ export default function CmsPortal({
                             ...cmsDb.siteSettings,
                             underConstruction: {
                               ...(cmsDb.siteSettings?.underConstruction || {}),
-                              footerNote: e.target.value
+                              footerNote: val
                             }
                           }
                         });
@@ -3831,26 +4343,26 @@ export default function CmsPortal({
 
                   <div className="form-group">
                     <label className="form-label">Hero Eyebrow Badge</label>
-                    <input
-                      type="text"
-                      className="form-input"
+                    <WysiwygEditor
+                      compact
+                      rows={1}
                       value={cmsDb.siteSettings.heroEyebrow || ''}
-                      onChange={(e) => {
+                      onChange={(val) => {
                         setHasUnsavedChanges(true);
-                        setCmsDb({ ...cmsDb, siteSettings: { ...cmsDb.siteSettings, heroEyebrow: e.target.value } });
+                        setCmsDb({ ...cmsDb, siteSettings: { ...cmsDb.siteSettings, heroEyebrow: val } });
                       }}
                     />
                   </div>
 
                   <div className="form-group">
                     <label className="form-label">Couple Full Names</label>
-                    <input
-                      type="text"
-                      className="form-input"
+                    <WysiwygEditor
+                      compact
+                      rows={1}
                       value={cmsDb.siteSettings.coupleNames || ''}
-                      onChange={(e) => {
+                      onChange={(val) => {
                         setHasUnsavedChanges(true);
-                        setCmsDb({ ...cmsDb, siteSettings: { ...cmsDb.siteSettings, coupleNames: e.target.value } });
+                        setCmsDb({ ...cmsDb, siteSettings: { ...cmsDb.siteSettings, coupleNames: val } });
                       }}
                     />
                   </div>
@@ -3870,13 +4382,12 @@ export default function CmsPortal({
 
                   <div className="form-group">
                     <label className="form-label">Hero Invitation Tagline</label>
-                    <textarea
+                    <WysiwygEditor
                       rows={2}
-                      className="form-textarea"
                       value={cmsDb.siteSettings.heroTagline || ''}
-                      onChange={(e) => {
+                      onChange={(val) => {
                         setHasUnsavedChanges(true);
-                        setCmsDb({ ...cmsDb, siteSettings: { ...cmsDb.siteSettings, heroTagline: e.target.value } });
+                        setCmsDb({ ...cmsDb, siteSettings: { ...cmsDb.siteSettings, heroTagline: val } });
                       }}
                     />
                   </div>
@@ -4180,12 +4691,11 @@ export default function CmsPortal({
 
                   <div className="form-group" style={{ marginBottom: '0.55rem' }}>
                     <label className="form-label">Main Page Title / Headline (e.g. “The Twilight Ceremony”)</label>
-                    <input
-                      type="text"
-                      className="form-input"
+                    <WysiwygEditor
+                      compact
+                      rows={1}
                       value={currentPageObj.headline || ''}
-                      onChange={(e) => updatePageField(builderPage, 'headline', e.target.value)}
-                      style={{ fontWeight: 700, fontSize: '0.96rem', borderColor: 'var(--border-gold)' }}
+                      onChange={(val) => updatePageField(builderPage, 'headline', val)}
                     />
                   </div>
 
@@ -4213,11 +4723,10 @@ export default function CmsPortal({
 
                   <div className="form-group" style={{ marginBottom: '0.55rem' }}>
                     <label className="form-label">Page Intro Subtitle / Description</label>
-                    <textarea
+                    <WysiwygEditor
                       rows={2}
-                      className="form-textarea"
                       value={currentPageObj.subheadline ?? ''}
-                      onChange={(e) => updatePageField(builderPage, 'subheadline', e.target.value)}
+                      onChange={(val) => updatePageField(builderPage, 'subheadline', val)}
                     />
                   </div>
 
@@ -4268,11 +4777,10 @@ export default function CmsPortal({
                           </div>
                           <div className="form-group">
                             <label className="form-label">Scanner Instructions Paragraph</label>
-                            <textarea
+                            <WysiwygEditor
                               rows={2}
-                              className="form-textarea"
                               value={currentPageObj.scannerSubtitle ?? ''}
-                              onChange={(e) => updatePageField('rsvpPage', 'scannerSubtitle', e.target.value)}
+                              onChange={(val) => updatePageField('rsvpPage', 'scannerSubtitle', val)}
                             />
                           </div>
                           <div className="grid-2" style={{ gap: '0.5rem' }}>
@@ -4357,23 +4865,22 @@ export default function CmsPortal({
                           <>
                             <div className="form-group">
                               <label className="form-label">Bottom Banner Title</label>
-                              <input
-                                type="text"
-                                className="form-input"
+                              <WysiwygEditor
+                                compact
+                                rows={1}
                                 value={currentPageObj.bottomBannerTitle ?? 'Join Us Under the October Moon'}
-                                onChange={(e) => updatePageField(builderPage, 'bottomBannerTitle', e.target.value)}
+                                onChange={(val) => updatePageField(builderPage, 'bottomBannerTitle', val)}
                               />
                             </div>
                             <div className="form-group">
                               <label className="form-label">Bottom Banner Subtitle</label>
-                              <textarea
+                              <WysiwygEditor
                                 rows={2}
-                                className="form-textarea"
                                 value={
                                   currentPageObj.bottomBannerSubtitle ??
                                   'Explore our candlelit ceremony details, autumn feast menu, or scan your invitation QR code to RSVP.'
                                 }
-                                onChange={(e) => updatePageField(builderPage, 'bottomBannerSubtitle', e.target.value)}
+                                onChange={(val) => updatePageField(builderPage, 'bottomBannerSubtitle', val)}
                               />
                             </div>
                             <div className="grid-2" style={{ gap: '0.5rem' }}>
@@ -4428,29 +4935,28 @@ export default function CmsPortal({
                     <>
                       <div className="form-group">
                         <label className="form-label">Section Kicker (Small Top Label)</label>
-                        <input
-                          type="text"
-                          className="form-input"
+                        <WysiwygEditor
+                          compact
+                          rows={1}
                           value={selectedBlock.kicker || ''}
-                          onChange={(e) => updateSelectedBlock(builderPage, { kicker: e.target.value })}
+                          onChange={(val) => updateSelectedBlock(builderPage, { kicker: val })}
                         />
                       </div>
                       <div className="form-group">
                         <label className="form-label">Section Headline</label>
-                        <input
-                          type="text"
-                          className="form-input"
+                        <WysiwygEditor
+                          compact
+                          rows={1}
                           value={selectedBlock.title || ''}
-                          onChange={(e) => updateSelectedBlock(builderPage, { title: e.target.value })}
+                          onChange={(val) => updateSelectedBlock(builderPage, { title: val })}
                         />
                       </div>
                       <div className="form-group">
                         <label className="form-label">Section Subtitle</label>
-                        <textarea
+                        <WysiwygEditor
                           rows={2}
-                          className="form-textarea"
                           value={selectedBlock.subtitle || ''}
-                          onChange={(e) => updateSelectedBlock(builderPage, { subtitle: e.target.value })}
+                          onChange={(val) => updateSelectedBlock(builderPage, { subtitle: val })}
                         />
                       </div>
                     </>
@@ -4587,13 +5093,13 @@ export default function CmsPortal({
 
                       <div className="form-group">
                         <label className="form-label">Top Note Label</label>
-                        <input
-                          type="text"
-                          className="form-input"
+                        <WysiwygEditor
+                          compact
+                          rows={1}
                           value={selectedBlock.settings?.noteLabel || ''}
-                          onChange={(e) =>
+                          onChange={(val) =>
                             updateSelectedBlock(builderPage, (b) => {
-                              b.settings = { ...(b.settings || {}), noteLabel: e.target.value };
+                              b.settings = { ...(b.settings || {}), noteLabel: val };
                               return b;
                             })
                           }
@@ -4601,13 +5107,12 @@ export default function CmsPortal({
                       </div>
                       <div className="form-group">
                         <label className="form-label">Romantic Quote</label>
-                        <textarea
+                        <WysiwygEditor
                           rows={2}
-                          className="form-textarea"
                           value={selectedBlock.settings?.quote || ''}
-                          onChange={(e) =>
+                          onChange={(val) =>
                             updateSelectedBlock(builderPage, (b) => {
-                              b.settings = { ...(b.settings || {}), quote: e.target.value };
+                              b.settings = { ...(b.settings || {}), quote: val };
                               return b;
                             })
                           }
@@ -4615,13 +5120,13 @@ export default function CmsPortal({
                       </div>
                       <div className="form-group">
                         <label className="form-label">Subtext Below Quote</label>
-                        <input
-                          type="text"
-                          className="form-input"
+                        <WysiwygEditor
+                          compact
+                          rows={1}
                           value={selectedBlock.settings?.subtext || ''}
-                          onChange={(e) =>
+                          onChange={(val) =>
                             updateSelectedBlock(builderPage, (b) => {
-                              b.settings = { ...(b.settings || {}), subtext: e.target.value };
+                              b.settings = { ...(b.settings || {}), subtext: val };
                               return b;
                             })
                           }
@@ -4679,13 +5184,13 @@ export default function CmsPortal({
                       </div>
                       <div className="form-group">
                         <label className="form-label">Venue Name</label>
-                        <input
-                          type="text"
-                          className="form-input"
+                        <WysiwygEditor
+                          compact
+                          rows={1}
                           value={selectedBlock.settings?.venueName || ''}
-                          onChange={(e) =>
+                          onChange={(val) =>
                             updateSelectedBlock(builderPage, (b) => {
-                              b.settings = { ...(b.settings || {}), venueName: e.target.value };
+                              b.settings = { ...(b.settings || {}), venueName: val };
                               return b;
                             })
                           }
@@ -4693,13 +5198,13 @@ export default function CmsPortal({
                       </div>
                       <div className="form-group">
                         <label className="form-label">Venue Address</label>
-                        <input
-                          type="text"
-                          className="form-input"
+                        <WysiwygEditor
+                          compact
+                          rows={1}
                           value={selectedBlock.settings?.venueAddress || selectedBlock.settings?.address || ''}
-                          onChange={(e) =>
+                          onChange={(val) =>
                             updateSelectedBlock(builderPage, (b) => {
-                              b.settings = { ...(b.settings || {}), venueAddress: e.target.value, address: e.target.value };
+                              b.settings = { ...(b.settings || {}), venueAddress: val, address: val };
                               return b;
                             })
                           }
@@ -4707,14 +5212,13 @@ export default function CmsPortal({
                       </div>
                       <div className="form-group">
                         <label className="form-label">Venue Description / Notes Paragraph (Optional)</label>
-                        <textarea
+                        <WysiwygEditor
                           rows={2}
-                          className="form-textarea"
                           placeholder="Add optional notes about the venue, attire, or arrival..."
                           value={selectedBlock.settings?.description || selectedBlock.settings?.attireNote || ''}
-                          onChange={(e) =>
+                          onChange={(val) =>
                             updateSelectedBlock(builderPage, (b) => {
-                              b.settings = { ...(b.settings || {}), description: e.target.value, attireNote: e.target.value };
+                              b.settings = { ...(b.settings || {}), description: val, attireNote: val };
                               return b;
                             })
                           }
@@ -4911,13 +5415,12 @@ export default function CmsPortal({
                       )}
                       <div className="form-group">
                         <label className="form-label">Body Paragraph Text</label>
-                        <textarea
+                        <WysiwygEditor
                           rows={4}
-                          className="form-textarea"
                           value={selectedBlock.settings?.bodyText || ''}
-                          onChange={(e) =>
+                          onChange={(val) =>
                             updateSelectedBlock(builderPage, (b) => {
-                              b.settings = { ...(b.settings || {}), bodyText: e.target.value };
+                              b.settings = { ...(b.settings || {}), bodyText: val };
                               return b;
                             })
                           }

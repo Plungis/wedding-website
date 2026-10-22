@@ -18,7 +18,7 @@ import {
   UserPlus,
   Crown
 } from 'lucide-react';
-import PageBlockRenderer, { GothicRoseArchOrnament } from './PageBlockRenderer.jsx';
+import PageBlockRenderer, { GothicRoseArchOrnament, RichText } from './PageBlockRenderer.jsx';
 
 function extractCodeFromRawText(rawText = '') {
   const trimmed = rawText.trim();
@@ -311,21 +311,33 @@ export default function RsvpTab({
         <div className="section-header-box">
           {rsvpPage?.kicker !== '' && (
             <span className="section-kicker">
-              {rsvpPage?.kicker ?? '04 • Personalized QR Invitation'}
+              <RichText text={rsvpPage?.kicker ?? '04 • Personalized QR Invitation'} />
             </span>
           )}
           <h2 className="section-title">
-            {rsvpPage?.headline || 'Respond to Your Invitation'}
+            <RichText text={rsvpPage?.headline || 'Respond to Your Invitation'} />
           </h2>
           {rsvpPage?.divider ? (
-            <div className="goth-divider">{rsvpPage.divider}</div>
+            <div className="goth-divider"><RichText text={rsvpPage.divider} /></div>
           ) : (
             <GothicRoseArchOrnament width={210} />
           )}
           <p className="section-subtitle">
-            {rsvpPage?.subheadline ??
-              'Scan the unique QR code included with your wedding invitation—or enter your personal invitation code below—to unlock your household’s RSVP card.'}
-            {rsvpDeadline ? ` Kindly respond by ${rsvpDeadline}.` : ''}
+            <RichText
+              text={
+                rsvpPage?.subheadline ??
+                'Scan the unique QR code included with your wedding invitation—or enter your personal invitation code below—to unlock your household’s RSVP card.'
+              }
+            />
+            {rsvpDeadline ? (
+              <>
+                {' Kindly respond by '}
+                <RichText text={rsvpDeadline} />
+                {'.'}
+              </>
+            ) : (
+              ''
+            )}
           </p>
         </div>
       )}
@@ -343,15 +355,19 @@ export default function RsvpTab({
           <div>
             {(rsvpPage?.scannerBadge ?? 'Instant QR Code Access') && (
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(209, 142, 71, 0.18)', border: '1px solid var(--border-gold)', color: 'var(--accent-secondary)', padding: '0.35rem 0.85rem', borderRadius: '999px', fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '0.85rem' }}>
-                <QrCode size={15} /> {rsvpPage?.scannerBadge ?? 'Instant QR Code Access'}
+                <QrCode size={15} /> <RichText text={rsvpPage?.scannerBadge ?? 'Instant QR Code Access'} />
               </div>
             )}
             <h3 style={{ fontSize: '2.1rem', marginBottom: '0.5rem', color: '#f9f3eb' }}>
-              {rsvpPage?.scannerTitle || 'Have Your Wedding QR Card?'}
+              <RichText text={rsvpPage?.scannerTitle || 'Have Your Wedding QR Card?'} />
             </h3>
             <p style={{ color: 'rgba(244, 236, 225, 0.86)', fontSize: '0.94rem', marginBottom: '1.25rem' }}>
-              {rsvpPage?.scannerSubtitle ||
-                'Point your phone’s camera at the QR code on your paper invitation to open your RSVP automatically, use our built-in camera scanner, or type your personal invitation code.'}
+              <RichText
+                text={
+                  rsvpPage?.scannerSubtitle ||
+                  'Point your phone’s camera at the QR code on your paper invitation to open your RSVP automatically, use our built-in camera scanner, or type your personal invitation code.'
+                }
+              />
             </p>
 
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -430,8 +446,12 @@ export default function RsvpTab({
               </button>
             </div>
             <p style={{ fontSize: '0.79rem', color: 'var(--text-muted)', marginTop: '0.65rem' }}>
-              {rsvpPage?.codeInputHint ??
-                'Your unique code is printed directly below the QR square on your physical RSVP insert card.'}
+              <RichText
+                text={
+                  rsvpPage?.codeInputHint ??
+                  'Your unique code is printed directly below the QR square on your physical RSVP insert card.'
+                }
+              />
             </p>
           </form>
         </div>
@@ -708,7 +728,7 @@ export default function RsvpTab({
                     fontStyle: 'italic'
                   }}
                 >
-                  “{guestData.personalNote}”
+                  “<RichText text={guestData.personalNote} />”
                 </div>
               )}
 
