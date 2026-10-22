@@ -16,7 +16,16 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '25mb' }));
+
+function syncReceptionMenuOptions(db) {
+  if (db?.reception?.blocks) {
+    const menuBlock = db.reception.blocks.find((b) => b.type === 'dinner_menu');
+    if (menuBlock && Array.isArray(menuBlock.items)) {
+      db.reception.menuOptions = menuBlock.items;
+    }
+  }
+}
 
 // Ensure data directory and database file exist
 function loadDatabase() {
@@ -30,10 +39,31 @@ function loadDatabase() {
     }
     const raw = fs.readFileSync(DB_PATH, 'utf-8');
     const parsed = JSON.parse(raw);
-    return {
+    const merged = {
       ...structuredClone(defaultDatabase),
-      ...parsed
+      ...parsed,
+      siteSettings: {
+        ...structuredClone(defaultDatabase.siteSettings),
+        ...(parsed.siteSettings || {})
+      },
+      aboutUs: {
+        ...structuredClone(defaultDatabase.aboutUs),
+        ...(parsed.aboutUs || {}),
+        blocks: parsed.aboutUs?.blocks || structuredClone(defaultDatabase.aboutUs.blocks)
+      },
+      ceremony: {
+        ...structuredClone(defaultDatabase.ceremony),
+        ...(parsed.ceremony || {}),
+        blocks: parsed.ceremony?.blocks || structuredClone(defaultDatabase.ceremony.blocks)
+      },
+      reception: {
+        ...structuredClone(defaultDatabase.reception),
+        ...(parsed.reception || {}),
+        blocks: parsed.reception?.blocks || structuredClone(defaultDatabase.reception.blocks)
+      }
     };
+    syncReceptionMenuOptions(merged);
+    return merged;
   } catch (err) {
     console.error('Error loading database, falling back to default:', err);
     return structuredClone(defaultDatabase);
@@ -295,10 +325,31 @@ app.put('/api/admin/section/:sectionName', requireAdmin, (req, res) => {
   }
 
   db[sectionName] = req.body.data;
-  saveDatabase(db, `Updated ${sectionName} content via CMS`, sectionName);
+  syncReceptionMenuOptions(db);
+  saveDatabase(db, `Updated ${sectionName} layout & content via Drag-and-Drop CMS`, sectionName);
 
   res.json({
     message: `${sectionName} updated successfully`,
+    db,
+    analytics: computeAnalytics(db.guests, db.reception?.menuOptions)
+  });
+});
+
+// 6b. Publish Full CMS State (All Pages + Site Settings at once)
+app.put('/api/admin/publish-all', requireAdmin, (req, res) => {
+  const db = req.db;
+  const { siteSettings, aboutUs, ceremony, reception } = req.body || {};
+
+  if (siteSettings) db.siteSettings = siteSettings;
+  if (aboutUs) db.aboutUs = aboutUs;
+  if (ceremony) db.ceremony = ceremony;
+  if (reception) db.reception = reception;
+
+  syncReceptionMenuOptions(db);
+  saveDatabase(db, 'Published visual drag-and-drop changes across website sections', 'visual-builder');
+
+  res.json({
+    message: 'All website sections published live!',
     db,
     analytics: computeAnalytics(db.guests, db.reception?.menuOptions)
   });

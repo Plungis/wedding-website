@@ -14,37 +14,62 @@ import CeremonyTab from './components/CeremonyTab.jsx';
 import ReceptionTab from './components/ReceptionTab.jsx';
 import RsvpTab from './components/RsvpTab.jsx';
 import CmsPortal from './components/CmsPortal.jsx';
+import { renderDynamicIcon } from './components/PageBlockRenderer.jsx';
 
-const BIG_TABS = [
+const DEFAULT_BIG_TABS = [
   {
     id: 'about',
     step: '01 • Kindred Spirits',
     title: 'About Us',
     subtitle: 'Our autumn story, portraits & wedding party',
-    icon: Heart
+    icon: 'Heart',
+    visible: true
   },
   {
     id: 'ceremony',
     step: '02 • Twilight Vows',
     title: 'Ceremony',
     subtitle: 'Candlelit manor gardens, attire & shuttles',
-    icon: Sparkles
+    icon: 'Sparkles',
+    visible: true
   },
   {
     id: 'reception',
     step: '03 • The Feast',
     title: 'Reception',
     subtitle: 'Conservatory banquet, apothecary bar & hotels',
-    icon: Wine
+    icon: 'Wine',
+    visible: true
   },
   {
     id: 'rsvp',
     step: '04 • Respond',
     title: 'QR Code RSVP',
     subtitle: 'Scan your invitation QR or enter your code',
-    icon: QrCode
+    icon: 'QrCode',
+    visible: true
   }
 ];
+
+function applyThemeAndCustomColors(siteSettings) {
+  const theme = siteSettings?.theme || 'fall-goth';
+  document.documentElement.setAttribute('data-theme', theme);
+  const root = document.documentElement;
+  const cc = siteSettings?.customColors;
+  if (cc && cc.enabled) {
+    if (cc.bgPrimary) root.style.setProperty('--bg-primary', cc.bgPrimary);
+    if (cc.bgCard) root.style.setProperty('--bg-card', cc.bgCard);
+    if (cc.accentPrimary) root.style.setProperty('--accent-primary', cc.accentPrimary);
+    if (cc.accentSecondary) root.style.setProperty('--accent-secondary', cc.accentSecondary);
+    if (cc.textPrimary) root.style.setProperty('--text-primary', cc.textPrimary);
+  } else {
+    root.style.removeProperty('--bg-primary');
+    root.style.removeProperty('--bg-card');
+    root.style.removeProperty('--accent-primary');
+    root.style.removeProperty('--accent-secondary');
+    root.style.removeProperty('--text-primary');
+  }
+}
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('about');
@@ -59,8 +84,7 @@ export default function App() {
       const data = await res.json();
       if (res.ok) {
         setSiteData(data);
-        const theme = data.siteSettings?.theme || 'fall-goth';
-        document.documentElement.setAttribute('data-theme', theme);
+        applyThemeAndCustomColors(data.siteSettings);
       }
     } catch (err) {
       console.error('Failed to fetch wedding content:', err);
@@ -72,7 +96,6 @@ export default function App() {
   useEffect(() => {
     loadContent();
 
-    // Check if guest arrived by scanning a unique QR code (?rsvp=CODE or ?code=CODE)
     const params = new URLSearchParams(window.location.search);
     const scannedCode = params.get('rsvp') || params.get('code');
     if (scannedCode) {
@@ -99,13 +122,14 @@ export default function App() {
   if (loading && !siteData) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '0.75rem' }}>
-        <Heart size={36} color="var(--accent-primary)" />
-        <div className="serif-font" style={{ fontSize: '1.75rem' }}>Loading Wedding Celebration...</div>
+        <Heart size={36} color="var(--accent-secondary)" />
+        <div className="serif-font" style={{ fontSize: '1.75rem' }}>Loading Autumn Celebration...</div>
       </div>
     );
   }
 
   const { siteSettings, aboutUs, ceremony, reception, sampleInvites } = siteData || {};
+  const visibleTabs = (siteSettings?.bigTabs || DEFAULT_BIG_TABS).filter((t) => t.visible !== false);
 
   return (
     <div className="wedding-app-wrapper">
@@ -116,7 +140,7 @@ export default function App() {
             <strong>{siteSettings?.shortNames || 'Elena & Julian'}</strong> • Wedding Celebration
           </span>
           {siteSettings?.hashtag && (
-            <span style={{ opacity: 0.8, display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
+            <span style={{ opacity: 0.85, display: 'inline-flex', alignItems: 'center', gap: '0.2rem', color: 'var(--accent-secondary)' }}>
               <Hash size={13} />
               {siteSettings.hashtag.replace(/^#/, '')}
             </span>
@@ -129,7 +153,7 @@ export default function App() {
             className="cms-launch-btn"
             onClick={() => setCmsOpen(true)}
           >
-            <Settings size={14} /> Open Back-End CMS & QR Studio
+            <Settings size={14} /> Open Drag & Drop CMS Studio
           </button>
         </div>
       </div>
@@ -145,7 +169,9 @@ export default function App() {
         }}
       >
         <div className="wedding-hero-inner">
-          <span className="hero-eyebrow">✦ Autumn Twilight Celebration • Till Death Do Us Party ✦</span>
+          <span className="hero-eyebrow">
+            {siteSettings?.heroEyebrow || '✦ Autumn Twilight Celebration • Till Death Do Us Party ✦'}
+          </span>
           <h1 className="hero-couple-names">
             {siteSettings?.coupleNames || 'Elena Vance & Julian Sterling'}
           </h1>
@@ -167,9 +193,13 @@ export default function App() {
 
       {/* BIG TABS AS THE MAIN DISPLAY */}
       <nav className="big-tabs-shell no-print" aria-label="Main Wedding Sections">
-        <div className="big-tabs-grid">
-          {BIG_TABS.map((tab) => {
-            const IconComponent = tab.icon;
+        <div
+          className="big-tabs-grid"
+          style={{
+            gridTemplateColumns: `repeat(${Math.min(visibleTabs.length, 4)}, 1fr)`
+          }}
+        >
+          {visibleTabs.map((tab) => {
             const isActive = activeTab === tab.id;
             return (
               <button
@@ -180,7 +210,7 @@ export default function App() {
               >
                 <div className="big-tab-top">
                   <div className="big-tab-icon-wrap">
-                    <IconComponent size={22} />
+                    {renderDynamicIcon(tab.icon || 'Heart', 22)}
                   </div>
                   <span className="big-tab-step">{tab.step}</span>
                 </div>
@@ -210,6 +240,7 @@ export default function App() {
         {activeTab === 'ceremony' && (
           <CeremonyTab
             ceremony={ceremony}
+            siteSettings={siteSettings}
             onSelectTab={handleSelectTab}
           />
         )}
@@ -217,6 +248,7 @@ export default function App() {
         {activeTab === 'reception' && (
           <ReceptionTab
             reception={reception}
+            siteSettings={siteSettings}
             onSelectTab={handleSelectTab}
           />
         )}
@@ -254,12 +286,12 @@ export default function App() {
             <QrCode size={15} /> QR Code RSVP
           </button>
           <button className="btn-secondary" onClick={() => setCmsOpen(true)}>
-            <Settings size={15} /> Manage Website in CMS (Passcode: wedding2026)
+            <Settings size={15} /> Launch Drag & Drop CMS Builder (Passcode: wedding2026)
           </button>
         </div>
       </footer>
 
-      {/* Robust Back-End CMS Modal / Studio */}
+      {/* Robust Drag-and-Drop Back-End CMS Studio */}
       <CmsPortal
         isOpen={cmsOpen}
         onClose={() => setCmsOpen(false)}
