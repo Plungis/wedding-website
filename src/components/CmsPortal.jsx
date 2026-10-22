@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import QRCode from 'qrcode';
 import PageBlockRenderer, { GothicRoseArchOrnament } from './PageBlockRenderer.jsx';
+import UnderConstructionView from './UnderConstructionView.jsx';
 import { applyThemeAndCustomColors } from '../App.jsx';
 import {
   X,
@@ -1925,7 +1926,7 @@ export default function CmsPortal({
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
             {savingStatus && (
               <span
                 style={{
@@ -1940,6 +1941,73 @@ export default function CmsPortal({
               >
                 {savingStatus}
               </span>
+            )}
+
+            {/* 1-Click Under Construction Mode Toggle + Edit Button */}
+            {cmsDb && (
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  background: cmsDb.siteSettings?.underConstruction?.enabled
+                    ? 'rgba(212, 168, 83, 0.2)'
+                    : 'var(--bg-secondary)',
+                  border: cmsDb.siteSettings?.underConstruction?.enabled
+                    ? '1.5px solid var(--accent-secondary)'
+                    : '1px solid var(--border-color)',
+                  padding: '0.32rem 0.7rem',
+                  borderRadius: '999px',
+                  fontSize: '0.78rem'
+                }}
+              >
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.38rem', cursor: 'pointer', fontWeight: 700, color: cmsDb.siteSettings?.underConstruction?.enabled ? 'var(--accent-secondary)' : 'var(--text-secondary)' }}>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(cmsDb.siteSettings?.underConstruction?.enabled)}
+                    onChange={(e) => {
+                      const nextEnabled = e.target.checked;
+                      setHasUnsavedChanges(true);
+                      setCmsDb({
+                        ...cmsDb,
+                        siteSettings: {
+                          ...cmsDb.siteSettings,
+                          underConstruction: {
+                            ...(cmsDb.siteSettings?.underConstruction || {}),
+                            enabled: nextEnabled
+                          }
+                        }
+                      });
+                      if (nextEnabled) {
+                        setStudioMode('builder');
+                        setBuilderPage('underConstruction');
+                      }
+                    }}
+                  />
+                  <span>
+                    🚧 Under Construction: {cmsDb.siteSettings?.underConstruction?.enabled ? 'ON' : 'OFF'}
+                  </span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStudioMode('builder');
+                    setBuilderPage('underConstruction');
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--accent-secondary)',
+                    textDecoration: 'underline',
+                    fontSize: '0.73rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    padding: 0
+                  }}
+                >
+                  Customize
+                </button>
+              </div>
             )}
 
             <button
@@ -2656,7 +2724,8 @@ export default function CmsPortal({
                     { id: 'ceremony', label: '02 • Ceremony Page', icon: Sparkles },
                     { id: 'reception', label: '03 • Reception & Menu Page', icon: Wine },
                     { id: 'rsvpPage', label: '04 • QR Code RSVP Page', icon: QrCode },
-                    { id: 'weddingPartyPage', label: '05 • Wedding Party VIP Page', icon: Crown }
+                    { id: 'weddingPartyPage', label: '05 • Wedding Party VIP Page', icon: Crown },
+                    { id: 'underConstruction', label: '06 • 🚧 Under Construction Mode', icon: Sparkles }
                   ].map((pg) => {
                     const IconC = pg.icon;
                     const active = builderPage === pg.id;
@@ -3189,133 +3258,171 @@ export default function CmsPortal({
                 )}
               </div>
 
-              {/* ALWAYS RENDER INTERACTIVE HOME HERO BANNER & BIG TABS AT TOP OF VISUAL CANVAS */}
-              <div
-                onClick={() => setSelectedBlockId('__HERO_BANNER__')}
-                style={{
-                  position: 'relative',
-                  marginBottom: '1.5rem',
-                  borderRadius: '20px',
-                  border:
-                    selectedBlockId === '__HERO_BANNER__' || builderPage === 'heroTabs'
-                      ? '2.5px solid var(--accent-secondary)'
-                      : '1.5px dashed rgba(212, 168, 83, 0.5)',
-                  padding: '0.75rem',
-                  background:
-                    selectedBlockId === '__HERO_BANNER__' || builderPage === 'heroTabs'
-                      ? 'rgba(158, 27, 50, 0.12)'
-                      : 'transparent',
-                  cursor: 'pointer'
-                }}
-              >
+              {builderPage === 'underConstruction' ? (
                 <div
                   style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    background: '#080508',
-                    border: '1px solid var(--border-gold)',
-                    borderRadius: '10px',
-                    padding: '0.42rem 0.75rem',
-                    marginBottom: '0.75rem',
-                    fontSize: '0.76rem'
+                    borderRadius: '20px',
+                    border: '2px solid var(--accent-secondary)',
+                    overflow: 'hidden'
                   }}
                 >
-                  <span style={{ fontWeight: 700, color: 'var(--accent-secondary)' }}>
-                    ★ HOME PAGE HERO BANNER (“{cmsDb.siteSettings?.coupleNames}”) & MOON TAGLINE
-                  </span>
-                  <span
+                  <div
                     style={{
-                      background: 'var(--accent-secondary)',
-                      color: '#090608',
-                      padding: '0.22rem 0.55rem',
-                      borderRadius: '6px',
-                      fontWeight: 700,
-                      fontSize: '0.72rem'
+                      background: '#080508',
+                      borderBottom: '1px solid var(--border-gold)',
+                      padding: '0.55rem 1rem',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      fontSize: '0.78rem'
                     }}
                   >
-                    Click to Edit Names, Moon Quote, Photo & Tabs →
-                  </span>
-                </div>
-
-                <header
-                  className="wedding-hero"
-                  style={{
-                    borderRadius: '18px',
-                    marginBottom: '1rem',
-                    padding: '2rem 1.25rem 2.35rem',
-                    backgroundImage: `url(${cmsDb.siteSettings?.heroBannerUrl})`,
-                    backgroundPosition: `${cmsDb.siteSettings?.heroBannerCrop?.x ?? 50}% ${cmsDb.siteSettings?.heroBannerCrop?.y ?? 50}%`
-                  }}
-                >
-                  <div className="hero-gothic-arch-frame">
-                    <span className="hero-eyebrow">{cmsDb.siteSettings?.heroEyebrow}</span>
-                    <h1 className="hero-couple-names" style={{ fontSize: '2.35rem' }}>
-                      {cmsDb.siteSettings?.coupleNames}
-                    </h1>
-                    <GothicRoseArchOrnament width={180} />
-                    <p className="hero-tagline">{cmsDb.siteSettings?.heroTagline}</p>
-                    <div className="hero-meta-pills">
-                      <span className="hero-pill">
-                        <Calendar size={14} color="var(--accent-secondary)" /> {cmsDb.siteSettings?.weddingDateDisplay}
-                      </span>
-                      <span className="hero-pill">
-                        <MapPin size={14} color="var(--accent-secondary)" /> {cmsDb.siteSettings?.locationSummary}
-                      </span>
-                    </div>
+                    <span style={{ fontWeight: 700, color: 'var(--accent-secondary)' }}>
+                      🚧 LIVE PREVIEW: UNDER CONSTRUCTION / SAVE-THE-DATE SCREEN
+                    </span>
+                    <span style={{ color: cmsDb.siteSettings?.underConstruction?.enabled ? '#34d399' : 'var(--text-muted)', fontWeight: 700 }}>
+                      {cmsDb.siteSettings?.underConstruction?.enabled ? '● ACTIVE FOR VISITORS' : '○ CURRENTLY OFF (NORMAL SITE LIVE)'}
+                    </span>
                   </div>
-                </header>
-
-                <div className="big-tabs-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.55rem' }}>
-                  {(cmsDb.siteSettings?.bigTabs || []).map((tab) => {
-                    const tabPageMap = {
-                      about: 'aboutUs',
-                      ceremony: 'ceremony',
-                      reception: 'reception',
-                      rsvp: 'rsvpPage'
-                    };
-                    const targetPg = tabPageMap[tab.id] || 'aboutUs';
-                    const isActiveTab = builderPage === targetPg;
-                    return (
-                      <div
-                        key={tab.id}
-                        className={`big-tab-card ${isActiveTab ? 'active' : ''}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setBuilderPage(targetPg);
-                        }}
+                  <UnderConstructionView
+                    previewOnly={true}
+                    siteSettings={cmsDb.siteSettings}
+                    aboutUs={cmsDb.aboutUs}
+                    rsvpPage={cmsDb.rsvpPage}
+                    reception={cmsDb.reception}
+                  />
+                </div>
+              ) : (
+                <>
+                  {/* ALWAYS RENDER INTERACTIVE HOME HERO BANNER & BIG TABS AT TOP OF VISUAL CANVAS */}
+                  <div
+                    onClick={() => setSelectedBlockId('__HERO_BANNER__')}
+                    style={{
+                      position: 'relative',
+                      marginBottom: '1.5rem',
+                      borderRadius: '20px',
+                      border:
+                        selectedBlockId === '__HERO_BANNER__' || builderPage === 'heroTabs'
+                          ? '2.5px solid var(--accent-secondary)'
+                          : '1.5px dashed rgba(212, 168, 83, 0.5)',
+                      padding: '0.75rem',
+                      background:
+                        selectedBlockId === '__HERO_BANNER__' || builderPage === 'heroTabs'
+                          ? 'rgba(158, 27, 50, 0.12)'
+                          : 'transparent',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        background: '#080508',
+                        border: '1px solid var(--border-gold)',
+                        borderRadius: '10px',
+                        padding: '0.42rem 0.75rem',
+                        marginBottom: '0.75rem',
+                        fontSize: '0.76rem'
+                      }}
+                    >
+                      <span style={{ fontWeight: 700, color: 'var(--accent-secondary)' }}>
+                        ★ HOME PAGE HERO BANNER (“{cmsDb.siteSettings?.coupleNames}”) & MOON TAGLINE
+                      </span>
+                      <span
                         style={{
-                          padding: '0.75rem',
-                          opacity: tab.visible === false ? 0.45 : 1,
-                          cursor: 'pointer'
+                          background: 'var(--accent-secondary)',
+                          color: '#090608',
+                          padding: '0.22rem 0.55rem',
+                          borderRadius: '6px',
+                          fontWeight: 700,
+                          fontSize: '0.72rem'
                         }}
                       >
-                        <div className="big-tab-top">
-                          <span className="big-tab-step" style={{ fontSize: '0.65rem' }}>{tab.step}</span>
-                        </div>
-                        <div>
-                          <div className="big-tab-title" style={{ fontSize: '1.05rem' }}>{tab.title}</div>
-                          <div className="big-tab-subtitle" style={{ fontSize: '0.72rem' }}>{tab.subtitle}</div>
+                        Click to Edit Names, Moon Quote, Photo & Tabs →
+                      </span>
+                    </div>
+
+                    <header
+                      className="wedding-hero"
+                      style={{
+                        borderRadius: '18px',
+                        marginBottom: '1rem',
+                        padding: '2rem 1.25rem 2.35rem',
+                        backgroundImage: `url(${cmsDb.siteSettings?.heroBannerUrl})`,
+                        backgroundPosition: `${cmsDb.siteSettings?.heroBannerCrop?.x ?? 50}% ${cmsDb.siteSettings?.heroBannerCrop?.y ?? 50}%`
+                      }}
+                    >
+                      <div className="hero-gothic-arch-frame">
+                        <span className="hero-eyebrow">{cmsDb.siteSettings?.heroEyebrow}</span>
+                        <h1 className="hero-couple-names" style={{ fontSize: '2.35rem' }}>
+                          {cmsDb.siteSettings?.coupleNames}
+                        </h1>
+                        <GothicRoseArchOrnament width={180} />
+                        <p className="hero-tagline">{cmsDb.siteSettings?.heroTagline}</p>
+                        <div className="hero-meta-pills">
+                          <span className="hero-pill">
+                            <Calendar size={14} color="var(--accent-secondary)" /> {cmsDb.siteSettings?.weddingDateDisplay}
+                          </span>
+                          <span className="hero-pill">
+                            <MapPin size={14} color="var(--accent-secondary)" /> {cmsDb.siteSettings?.locationSummary}
+                          </span>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
+                    </header>
 
-              {isBlockPage && currentPageObj && (
-                <PageBlockRenderer
-                  pageData={currentPageObj}
-                  siteSettings={cmsDb.siteSettings}
-                  editMode={true}
-                  selectedBlockId={selectedBlockId}
-                  onSelectBlock={(id) => setSelectedBlockId(id)}
-                  onMoveBlock={(idx, dir) => handleMoveBlock(builderPage, idx, dir)}
-                  onToggleBlockVisibility={(id) => handleToggleBlockVisibility(builderPage, id)}
-                  onDuplicateBlock={(id) => handleDuplicateBlock(builderPage, id)}
-                  onDeleteBlock={(id) => handleDeleteBlock(builderPage, id)}
-                  onDragReorderBlocks={(fromIdx, toIdx) => handleDragReorderBlocks(builderPage, fromIdx, toIdx)}
-                />
+                    <div className="big-tabs-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.55rem' }}>
+                      {(cmsDb.siteSettings?.bigTabs || []).map((tab) => {
+                        const tabPageMap = {
+                          about: 'aboutUs',
+                          ceremony: 'ceremony',
+                          reception: 'reception',
+                          rsvp: 'rsvpPage'
+                        };
+                        const targetPg = tabPageMap[tab.id] || 'aboutUs';
+                        const isActiveTab = builderPage === targetPg;
+                        return (
+                          <div
+                            key={tab.id}
+                            className={`big-tab-card ${isActiveTab ? 'active' : ''}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setBuilderPage(targetPg);
+                            }}
+                            style={{
+                              padding: '0.75rem',
+                              opacity: tab.visible === false ? 0.45 : 1,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <div className="big-tab-top">
+                              <span className="big-tab-step" style={{ fontSize: '0.65rem' }}>{tab.step}</span>
+                            </div>
+                            <div>
+                              <div className="big-tab-title" style={{ fontSize: '1.05rem' }}>{tab.title}</div>
+                              <div className="big-tab-subtitle" style={{ fontSize: '0.72rem' }}>{tab.subtitle}</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {isBlockPage && currentPageObj && (
+                    <PageBlockRenderer
+                      pageData={currentPageObj}
+                      siteSettings={cmsDb.siteSettings}
+                      editMode={true}
+                      selectedBlockId={selectedBlockId}
+                      onSelectBlock={(id) => setSelectedBlockId(id)}
+                      onMoveBlock={(idx, dir) => handleMoveBlock(builderPage, idx, dir)}
+                      onToggleBlockVisibility={(id) => handleToggleBlockVisibility(builderPage, id)}
+                      onDuplicateBlock={(id) => handleDuplicateBlock(builderPage, id)}
+                      onDeleteBlock={(id) => handleDeleteBlock(builderPage, id)}
+                      onDragReorderBlocks={(fromIdx, toIdx) => handleDragReorderBlocks(builderPage, fromIdx, toIdx)}
+                    />
+                  )}
+                </>
               )}
             </div>
 
@@ -3328,7 +3435,325 @@ export default function CmsPortal({
                 overflowY: 'auto'
               }}
             >
-              {(builderPage === 'heroTabs' || selectedBlockId === '__HERO_BANNER__') && (
+              {builderPage === 'underConstruction' && (
+                <div>
+                  <div
+                    style={{
+                      background: cmsDb.siteSettings?.underConstruction?.enabled
+                        ? 'rgba(16, 185, 129, 0.14)'
+                        : 'var(--bg-accent-subtle)',
+                      border: '2px solid var(--accent-secondary)',
+                      borderRadius: '14px',
+                      padding: '1rem',
+                      marginBottom: '1.25rem'
+                    }}
+                  >
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.96rem', color: 'var(--accent-secondary)' }}>
+                      <input
+                        type="checkbox"
+                        checked={Boolean(cmsDb.siteSettings?.underConstruction?.enabled)}
+                        onChange={(e) => {
+                          setHasUnsavedChanges(true);
+                          setCmsDb({
+                            ...cmsDb,
+                            siteSettings: {
+                              ...cmsDb.siteSettings,
+                              underConstruction: {
+                                ...(cmsDb.siteSettings?.underConstruction || {}),
+                                enabled: e.target.checked
+                              }
+                            }
+                          });
+                        }}
+                        style={{ width: '18px', height: '18px' }}
+                      />
+                      <span>
+                        🚧 Enable Under Construction / Save-the-Date Mode
+                      </span>
+                    </label>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '0.4rem', marginBottom: 0 }}>
+                      When enabled and published, visitors will see this romantic Save-the-Date & Under Construction screen with your names, countdown, and Bride & Groom portraits while you finish building your site!
+                    </p>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Couple Full Names (Displayed at Top)</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={cmsDb.siteSettings?.coupleNames || ''}
+                      onChange={(e) => {
+                        setHasUnsavedChanges(true);
+                        setCmsDb({
+                          ...cmsDb,
+                          siteSettings: { ...cmsDb.siteSettings, coupleNames: e.target.value }
+                        });
+                      }}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Top Eyebrow Badge</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={cmsDb.siteSettings?.underConstruction?.eyebrow ?? '✦ Save The Date • Full Wedding Website Unveiling Soon ✦'}
+                      onChange={(e) => {
+                        setHasUnsavedChanges(true);
+                        setCmsDb({
+                          ...cmsDb,
+                          siteSettings: {
+                            ...cmsDb.siteSettings,
+                            underConstruction: {
+                              ...(cmsDb.siteSettings?.underConstruction || {}),
+                              eyebrow: e.target.value
+                            }
+                          }
+                        });
+                      }}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Under Construction Headline</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={cmsDb.siteSettings?.underConstruction?.headline ?? 'Our Wedding Website Is Currently Under Construction'}
+                      onChange={(e) => {
+                        setHasUnsavedChanges(true);
+                        setCmsDb({
+                          ...cmsDb,
+                          siteSettings: {
+                            ...cmsDb.siteSettings,
+                            underConstruction: {
+                              ...(cmsDb.siteSettings?.underConstruction || {}),
+                              headline: e.target.value
+                            }
+                          }
+                        });
+                      }}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Under Construction Message / Subheadline</label>
+                    <textarea
+                      rows={3}
+                      className="form-textarea"
+                      value={
+                        cmsDb.siteSettings?.underConstruction?.subheadline ??
+                        'We are busy putting the finishing touches on our ceremony details, candlelit reception menu, and travel guide. Save our date below and check back soon!'
+                      }
+                      onChange={(e) => {
+                        setHasUnsavedChanges(true);
+                        setCmsDb({
+                          ...cmsDb,
+                          siteSettings: {
+                            ...cmsDb.siteSettings,
+                            underConstruction: {
+                              ...(cmsDb.siteSettings?.underConstruction || {}),
+                              subheadline: e.target.value
+                            }
+                          }
+                        });
+                      }}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Bottom Footer Note</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={cmsDb.siteSettings?.underConstruction?.footerNote ?? 'Questions in the meantime? Reach out to us directly!'}
+                      onChange={(e) => {
+                        setHasUnsavedChanges(true);
+                        setCmsDb({
+                          ...cmsDb,
+                          siteSettings: {
+                            ...cmsDb.siteSettings,
+                            underConstruction: {
+                              ...(cmsDb.siteSettings?.underConstruction || {}),
+                              footerNote: e.target.value
+                            }
+                          }
+                        });
+                      }}
+                    />
+                  </div>
+
+                  {/* Display Toggles */}
+                  <div
+                    style={{
+                      background: 'var(--bg-secondary)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '12px',
+                      padding: '0.85rem',
+                      marginBottom: '1rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.55rem'
+                    }}
+                  >
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.84rem' }}>
+                      <input
+                        type="checkbox"
+                        checked={cmsDb.siteSettings?.underConstruction?.showCouplePhotos !== false}
+                        onChange={(e) => {
+                          setHasUnsavedChanges(true);
+                          setCmsDb({
+                            ...cmsDb,
+                            siteSettings: {
+                              ...cmsDb.siteSettings,
+                              underConstruction: {
+                                ...(cmsDb.siteSettings?.underConstruction || {}),
+                                showCouplePhotos: e.target.checked
+                              }
+                            }
+                          });
+                        }}
+                      />
+                      <span>Display Bride & Groom Portrait Archways</span>
+                    </label>
+
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.84rem' }}>
+                      <input
+                        type="checkbox"
+                        checked={cmsDb.siteSettings?.underConstruction?.showCountdown !== false}
+                        onChange={(e) => {
+                          setHasUnsavedChanges(true);
+                          setCmsDb({
+                            ...cmsDb,
+                            siteSettings: {
+                              ...cmsDb.siteSettings,
+                              underConstruction: {
+                                ...(cmsDb.siteSettings?.underConstruction || {}),
+                                showCountdown: e.target.checked
+                              }
+                            }
+                          });
+                        }}
+                      />
+                      <span>Display Live Days/Hours/Minutes/Seconds Countdown</span>
+                    </label>
+
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.84rem' }}>
+                      <input
+                        type="checkbox"
+                        checked={cmsDb.siteSettings?.underConstruction?.showDateAndLocation !== false}
+                        onChange={(e) => {
+                          setHasUnsavedChanges(true);
+                          setCmsDb({
+                            ...cmsDb,
+                            siteSettings: {
+                              ...cmsDb.siteSettings,
+                              underConstruction: {
+                                ...(cmsDb.siteSettings?.underConstruction || {}),
+                                showDateAndLocation: e.target.checked
+                              }
+                            }
+                          });
+                        }}
+                      />
+                      <span>Display Wedding Date & Location Pills</span>
+                    </label>
+
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.84rem' }}>
+                      <input
+                        type="checkbox"
+                        checked={Boolean(cmsDb.siteSettings?.underConstruction?.allowRsvpAccess)}
+                        onChange={(e) => {
+                          setHasUnsavedChanges(true);
+                          setCmsDb({
+                            ...cmsDb,
+                            siteSettings: {
+                              ...cmsDb.siteSettings,
+                              underConstruction: {
+                                ...(cmsDb.siteSettings?.underConstruction || {}),
+                                allowRsvpAccess: e.target.checked
+                              }
+                            }
+                          });
+                        }}
+                      />
+                      <span>Allow Guests with QR Codes to Unlock Early RSVP</span>
+                    </label>
+                  </div>
+
+                  {/* Direct Bride & Groom Names & Portrait Photos Editor */}
+                  {(() => {
+                    const coupleIdx = (cmsDb.aboutUs?.blocks || []).findIndex((b) => b.type === 'couple_profiles');
+                    const coupleBlock = coupleIdx !== -1 ? cmsDb.aboutUs.blocks[coupleIdx] : null;
+                    if (!coupleBlock) return null;
+
+                    const updatePartnerItem = (pIdx, field, val) => {
+                      const nextBlocks = [...cmsDb.aboutUs.blocks];
+                      const nextItems = [...(nextBlocks[coupleIdx].items || [])];
+                      nextItems[pIdx] = { ...nextItems[pIdx], [field]: val };
+                      nextBlocks[coupleIdx] = { ...nextBlocks[coupleIdx], items: nextItems };
+                      updateBlocksForPage('aboutUs', nextBlocks);
+                    };
+
+                    return (
+                      <div
+                        style={{
+                          background: 'var(--bg-secondary)',
+                          border: '1.5px solid var(--border-gold)',
+                          borderRadius: '14px',
+                          padding: '0.95rem'
+                        }}
+                      >
+                        <div className="form-label" style={{ color: 'var(--accent-secondary)', marginBottom: '0.65rem' }}>
+                          Bride & Groom Names & Portraits (Used on Under Construction & About Us)
+                        </div>
+                        {(coupleBlock.items || []).map((person, pIdx) => (
+                          <div
+                            key={person.id || pIdx}
+                            style={{
+                              background: 'var(--bg-primary)',
+                              border: '1px solid var(--border-color)',
+                              borderRadius: '12px',
+                              padding: '0.8rem',
+                              marginBottom: '0.75rem'
+                            }}
+                          >
+                            <div className="grid-2" style={{ gap: '0.5rem' }}>
+                              <div className="form-group">
+                                <label className="form-label">Full Name</label>
+                                <input
+                                  type="text"
+                                  className="form-input"
+                                  value={person.name || ''}
+                                  onChange={(e) => updatePartnerItem(pIdx, 'name', e.target.value)}
+                                />
+                              </div>
+                              <div className="form-group">
+                                <label className="form-label">Role Badge</label>
+                                <input
+                                  type="text"
+                                  className="form-input"
+                                  value={person.role || ''}
+                                  onChange={(e) => updatePartnerItem(pIdx, 'role', e.target.value)}
+                                />
+                              </div>
+                            </div>
+                            <ImageFieldUploader
+                              label="Portrait Photo (Upload & Line Up / Crop)"
+                              value={person.photo}
+                              cropValue={person.photoCrop}
+                              onChange={(val) => updatePartnerItem(pIdx, 'photo', val)}
+                              onCropChange={(c) => updatePartnerItem(pIdx, 'photoCrop', c)}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {(builderPage === 'heroTabs' || (selectedBlockId === '__HERO_BANNER__' && builderPage !== 'underConstruction')) && (
                 <div
                   style={{
                     marginBottom: '1.35rem',

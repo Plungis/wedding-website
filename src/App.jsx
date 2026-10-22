@@ -15,6 +15,7 @@ import CeremonyTab from './components/CeremonyTab.jsx';
 import ReceptionTab from './components/ReceptionTab.jsx';
 import RsvpTab from './components/RsvpTab.jsx';
 import WeddingPartyTab from './components/WeddingPartyTab.jsx';
+import UnderConstructionView from './components/UnderConstructionView.jsx';
 import CmsPortal from './components/CmsPortal.jsx';
 import { renderDynamicIcon, GothicRoseArchOrnament } from './components/PageBlockRenderer.jsx';
 
@@ -80,6 +81,7 @@ export default function App() {
   const [qrCodeFromUrl, setQrCodeFromUrl] = useState('');
   const [cmsOpen, setCmsOpen] = useState(false);
   const [unlockedWeddingPartyGuest, setUnlockedWeddingPartyGuest] = useState(null);
+  const [adminBypassConstruction, setAdminBypassConstruction] = useState(false);
 
   const loadContent = useCallback(async () => {
     try {
@@ -132,6 +134,33 @@ export default function App() {
   }
 
   const { siteSettings, aboutUs, ceremony, reception, weddingPartyPage, rsvpPage, sampleInvites } = siteData || {};
+  const isUnderConstruction = Boolean(siteSettings?.underConstruction?.enabled);
+
+  if (isUnderConstruction && !adminBypassConstruction) {
+    return (
+      <>
+        <UnderConstructionView
+          siteSettings={siteSettings}
+          aboutUs={aboutUs}
+          rsvpPage={rsvpPage}
+          reception={reception}
+          sampleInvites={sampleInvites}
+          initialCode={qrCodeFromUrl}
+          onOpenCms={() => setCmsOpen(true)}
+          onPreviewFullSite={() => setAdminBypassConstruction(true)}
+          onRsvpSubmitted={loadContent}
+          onUnlockWeddingParty={(guest) => setUnlockedWeddingPartyGuest(guest)}
+        />
+        <CmsPortal
+          isOpen={cmsOpen}
+          onClose={() => setCmsOpen(false)}
+          onContentUpdated={loadContent}
+          onSimulateQrScan={handleSimulateQrScan}
+        />
+      </>
+    );
+  }
+
   const baseTabs = (siteSettings?.bigTabs || DEFAULT_BIG_TABS).filter((t) => t.visible !== false);
   const visibleTabs = unlockedWeddingPartyGuest || activeTab === 'wedding-party'
     ? [
@@ -150,6 +179,44 @@ export default function App() {
 
   return (
     <div className="wedding-app-wrapper">
+      {isUnderConstruction && adminBypassConstruction && (
+        <div
+          className="no-print"
+          style={{
+            background: 'linear-gradient(90deg, #5e1123, #2b0912)',
+            borderBottom: '1.5px solid var(--border-gold)',
+            padding: '0.55rem 1.25rem',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '0.75rem',
+            fontSize: '0.82rem'
+          }}
+        >
+          <span style={{ color: '#fff', fontWeight: 600 }}>
+            🚧 <strong style={{ color: 'var(--accent-secondary)' }}>Under Construction Mode is ACTIVE for Visitors</strong> — You are currently previewing the full site in Admin Bypass mode.
+          </span>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button
+              type="button"
+              className="btn-secondary"
+              style={{ padding: '0.28rem 0.75rem', fontSize: '0.75rem' }}
+              onClick={() => setAdminBypassConstruction(false)}
+            >
+              View Under Construction Screen
+            </button>
+            <button
+              type="button"
+              className="btn-primary"
+              style={{ padding: '0.28rem 0.75rem', fontSize: '0.75rem' }}
+              onClick={() => setCmsOpen(true)}
+            >
+              Edit in CMS Studio
+            </button>
+          </div>
+        </div>
+      )}
       {/* Top Bar with Quick CMS Studio Access */}
       <div className="top-utility-bar no-print">
         <div className="top-utility-left">

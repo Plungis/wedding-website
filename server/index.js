@@ -93,7 +93,11 @@ function loadDatabase() {
       ...parsed,
       siteSettings: {
         ...structuredClone(defaultDatabase.siteSettings),
-        ...(parsed.siteSettings || {})
+        ...(parsed.siteSettings || {}),
+        underConstruction: {
+          ...structuredClone(defaultDatabase.siteSettings.underConstruction),
+          ...(parsed.siteSettings?.underConstruction || {})
+        }
       },
       aboutUs: {
         ...structuredClone(defaultDatabase.aboutUs),

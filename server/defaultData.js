@@ -25,6 +25,18 @@ export const defaultDatabase = {
     topBarText: "Wedding Celebration",
     weddingPartyBtnText: "Wedding Party Portal",
     footerText: "Forever & Always Beneath the October Moon",
+    underConstruction: {
+      enabled: false,
+      eyebrow: "✦ Save The Date • Full Wedding Website Unveiling Soon ✦",
+      headline: "Our Wedding Website Is Currently Under Construction",
+      subheadline: "We are busy putting the finishing touches on our ceremony details, candlelit reception menu, and travel guide. Save our date below and check back soon!",
+      showCouplePhotos: true,
+      showCountdown: true,
+      showDateAndLocation: true,
+      allowRsvpAccess: false,
+      rsvpButtonText: "Have Your Invitation QR Code? Unlock Early RSVP",
+      footerNote: "Questions in the meantime? Reach out to us directly!"
+    },
     bigTabs: [
       {
         id: "about",
