@@ -8,19 +8,20 @@ export const defaultDatabase = {
     locationSummary: "Tarrytown • Hudson Valley, New York",
     rsvpDeadline: "September 15, 2027",
     hashtag: "#TillDeathDoUsParty2027",
-    theme: "fall-goth",
+    theme: "cathedral-roses",
     customColors: {
       enabled: false,
-      bgPrimary: "#120d14",
-      bgSecondary: "#1b131e",
-      bgCard: "#211726",
-      accentPrimary: "#8c1d35",
-      accentSecondary: "#d18e47",
-      textPrimary: "#f4ece1"
+      bgPrimary: "#090608",
+      bgSecondary: "#120b10",
+      bgCard: "#180f15",
+      accentPrimary: "#9e1b32",
+      accentSecondary: "#c89d66",
+      textPrimary: "#f5ebe6"
     },
     adminPasscode: "wedding2026",
-    heroBannerUrl: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=1800&q=85",
-    heroTagline: "Under the October harvest moon and falling crimson leaves, we invite you to celebrate our union.",
+    heroBannerUrl: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1800&q=85",
+    heroBannerCrop: { x: 50, y: 40, zoom: 1 },
+    heroTagline: "Beneath pointed cathedral archways, dark Baccara roses, and the October moon, we invite you to celebrate our union.",
     footerText: "Forever & Always Beneath the October Moon",
     bigTabs: [
       {

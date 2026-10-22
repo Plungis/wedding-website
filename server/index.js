@@ -62,6 +62,9 @@ function loadDatabase() {
         blocks: parsed.reception?.blocks || structuredClone(defaultDatabase.reception.blocks)
       }
     };
+    if (!merged.siteSettings.theme || merged.siteSettings.theme === 'fall-goth') {
+      merged.siteSettings.theme = 'cathedral-roses';
+    }
     syncReceptionMenuOptions(merged);
     return merged;
   } catch (err) {

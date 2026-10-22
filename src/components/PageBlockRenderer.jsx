@@ -59,11 +59,86 @@ export function renderDynamicIcon(iconName, size = 20, color = 'currentColor') {
   return <IconComp size={size} color={color} />;
 }
 
+// Gothic Pointed Cathedral Arch & Rose Filigree SVG Ornament
+export function GothicRoseArchOrnament({ width = 180 }) {
+  return (
+    <svg
+      width={width}
+      height="28"
+      viewBox="0 0 220 32"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      style={{ display: 'block', margin: '0.25rem auto 0.6rem', opacity: 0.88 }}
+    >
+      <path
+        d="M10 26 C55 26, 85 4, 110 2 C135 4, 165 26, 210 26"
+        stroke="var(--accent-secondary)"
+        strokeWidth="1.5"
+        fill="none"
+      />
+      <path
+        d="M35 28 C70 28, 92 11, 110 8 C128 11, 150 28, 185 28"
+        stroke="var(--accent-primary)"
+        strokeWidth="1"
+        strokeDasharray="3 3"
+        fill="none"
+      />
+      <circle cx="110" cy="15" r="5.5" fill="var(--accent-primary)" stroke="var(--accent-secondary)" strokeWidth="1.3" />
+      <circle cx="82" cy="21" r="2.5" fill="var(--accent-secondary)" />
+      <circle cx="138" cy="21" r="2.5" fill="var(--accent-secondary)" />
+    </svg>
+  );
+}
+
+// Reusable Image Renderer that applies interactive pan (x, y) & zoom crop alignment
+export function PositionedImage({
+  src,
+  alt,
+  crop,
+  height = '340px',
+  borderRadius = '16px',
+  border = 'none',
+  style = {}
+}) {
+  const x = crop?.x !== undefined ? Number(crop.x) : 50;
+  const y = crop?.y !== undefined ? Number(crop.y) : 50;
+  const zoom = crop?.zoom !== undefined ? Number(crop.zoom) : 1;
+
+  return (
+    <div
+      style={{
+        width: '100%',
+        height,
+        borderRadius,
+        border,
+        overflow: 'hidden',
+        position: 'relative',
+        background: '#050305',
+        ...style
+      }}
+    >
+      <img
+        src={src}
+        alt={alt || ''}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          objectPosition: `${x}% ${y}%`,
+          transform: zoom !== 1 ? `scale(${zoom})` : 'none',
+          transformOrigin: `${x}% ${y}%`,
+          display: 'block',
+          transition: 'object-position 0.08s ease-out, transform 0.08s ease-out'
+        }}
+      />
+    </div>
+  );
+}
+
 export default function PageBlockRenderer({
   pageData,
   siteSettings,
   onSelectTab,
-  // Visual Builder Props (optional, active when inside CMS Studio)
   editMode = false,
   selectedBlockId = null,
   onSelectBlock = null,
@@ -124,7 +199,7 @@ export default function PageBlockRenderer({
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--accent-secondary)', marginBottom: '0.6rem', fontWeight: 600, fontSize: '0.85rem', letterSpacing: '0.08em' }}>
                 <Heart size={16} fill="currentColor" /> {settings.noteLabel || `A NOTE FROM ${siteSettings?.shortNames?.toUpperCase() || 'US'}`}
               </div>
-              <blockquote className="serif-font" style={{ fontSize: '1.7rem', fontStyle: 'italic', color: 'var(--text-primary)', marginBottom: '0.75rem' }}>
+              <blockquote className="serif-font" style={{ fontSize: '1.75rem', fontStyle: 'italic', color: 'var(--text-primary)', marginBottom: '0.75rem' }}>
                 “{settings.quote || 'Whatever our souls are made of, yours and mine are the same.'}”
               </blockquote>
               <p style={{ fontSize: '0.94rem', color: 'var(--text-secondary)' }}>
@@ -140,8 +215,8 @@ export default function PageBlockRenderer({
                   gap: '0.85rem',
                   textAlign: 'center',
                   background: 'var(--bg-secondary)',
-                  padding: '1.35rem',
-                  borderRadius: '18px',
+                  padding: '1.4rem',
+                  borderRadius: '36px 36px 16px 16px',
                   border: '1px solid var(--border-gold)'
                 }}
               >
@@ -181,56 +256,60 @@ export default function PageBlockRenderer({
               <div className="section-header-box" style={{ marginBottom: '1.75rem' }}>
                 {block.kicker && <span className="section-kicker">{block.kicker}</span>}
                 {block.title && <h3 className="section-title" style={{ fontSize: '2.35rem' }}>{block.title}</h3>}
+                <GothicRoseArchOrnament />
                 {block.subtitle && <p className="section-subtitle">{block.subtitle}</p>}
               </div>
             )}
             <div className={getGridClass(settings.columns || 2)}>
-              {items.map((person, idx) => (
-                <div key={person.id || idx} className="couple-card">
-                  <div className="couple-card-img-wrap">
-                    <img
-                      src={person.photo}
-                      alt={person.name}
-                      className="couple-card-img"
-                      style={{
-                        borderRadius:
-                          settings.frameStyle === 'rounded'
-                            ? '16px'
-                            : settings.frameStyle === 'circle'
-                            ? '50%'
-                            : '160px 160px 14px 14px'
-                      }}
-                    />
+              {items.map((person, idx) => {
+                const radius =
+                  settings.frameStyle === 'rounded'
+                    ? '18px'
+                    : settings.frameStyle === 'circle'
+                    ? '50%'
+                    : '220px 220px 14px 14px';
+                return (
+                  <div key={person.id || idx} className="couple-card">
+                    <div className="couple-card-img-wrap">
+                      <PositionedImage
+                        src={person.photo}
+                        alt={person.name}
+                        crop={person.photoCrop}
+                        height="370px"
+                        borderRadius={radius}
+                        border="2px solid var(--border-gold)"
+                      />
+                    </div>
+                    <div className="couple-card-body">
+                      {person.role && <span className="role-badge">{person.role}</span>}
+                      <h3 style={{ fontSize: '2.1rem', marginBottom: '0.65rem' }}>{person.name}</h3>
+                      <p style={{ color: 'var(--text-secondary)', marginBottom: '1.15rem', fontSize: '0.96rem' }}>
+                        {person.bio}
+                      </p>
+                      {person.funFact && (
+                        <div
+                          style={{
+                            background: 'var(--bg-accent-subtle)',
+                            border: '1px solid var(--border-gold)',
+                            padding: '0.75rem 1rem',
+                            borderRadius: '12px',
+                            fontSize: '0.86rem',
+                            color: 'var(--text-primary)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem'
+                          }}
+                        >
+                          <Sparkles size={16} color="var(--accent-secondary)" style={{ flexShrink: 0 }} />
+                          <span>
+                            <strong style={{ color: 'var(--accent-secondary)' }}>Fun Fact:</strong> {person.funFact}
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="couple-card-body">
-                    {person.role && <span className="role-badge">{person.role}</span>}
-                    <h3 style={{ fontSize: '2.1rem', marginBottom: '0.65rem' }}>{person.name}</h3>
-                    <p style={{ color: 'var(--text-secondary)', marginBottom: '1.15rem', fontSize: '0.96rem' }}>
-                      {person.bio}
-                    </p>
-                    {person.funFact && (
-                      <div
-                        style={{
-                          background: 'var(--bg-accent-subtle)',
-                          border: '1px solid var(--border-gold)',
-                          padding: '0.75rem 1rem',
-                          borderRadius: '12px',
-                          fontSize: '0.86rem',
-                          color: 'var(--text-primary)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.5rem'
-                        }}
-                      >
-                        <Sparkles size={16} color="var(--accent-secondary)" style={{ flexShrink: 0 }} />
-                        <span>
-                          <strong style={{ color: 'var(--accent-secondary)' }}>Fun Fact:</strong> {person.funFact}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         );
@@ -242,13 +321,23 @@ export default function PageBlockRenderer({
               <div className="section-header-box" style={{ marginBottom: '1.75rem' }}>
                 {block.kicker && <span className="section-kicker">{block.kicker}</span>}
                 {block.title && <h3 className="section-title" style={{ fontSize: '2.35rem' }}>{block.title}</h3>}
+                <GothicRoseArchOrnament />
                 {block.subtitle && <p className="section-subtitle">{block.subtitle}</p>}
               </div>
             )}
             <div className="timeline-list">
               {items.map((item, idx) => (
                 <div key={item.id || idx} className="timeline-item">
-                  <img src={item.image} alt={item.title} className="timeline-img" />
+                  <div className="timeline-img-wrap">
+                    <PositionedImage
+                      src={item.image}
+                      alt={item.title}
+                      crop={item.imageCrop}
+                      height="100%"
+                      borderRadius="0px"
+                      style={{ minHeight: '220px' }}
+                    />
+                  </div>
                   <div className="timeline-content">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.45rem', flexWrap: 'wrap' }}>
                       {item.year && (
@@ -279,25 +368,32 @@ export default function PageBlockRenderer({
               <div className="section-header-box" style={{ marginBottom: '1.75rem' }}>
                 {block.kicker && <span className="section-kicker">{block.kicker}</span>}
                 {block.title && <h3 className="section-title" style={{ fontSize: '2.35rem' }}>{block.title}</h3>}
+                <GothicRoseArchOrnament />
                 {block.subtitle && <p className="section-subtitle">{block.subtitle}</p>}
               </div>
             )}
             <div className={getGridClass(settings.columns || 4)}>
               {items.map((member, idx) => (
-                <div key={member.id || idx} className="surface-card" style={{ padding: '1.45rem', textAlign: 'center' }}>
+                <div
+                  key={member.id || idx}
+                  className="surface-card"
+                  style={{
+                    padding: '1.5rem 1.35rem',
+                    textAlign: 'center',
+                    borderRadius: '110px 110px 20px 20px'
+                  }}
+                >
                   {member.photo && (
-                    <img
-                      src={member.photo}
-                      alt={member.name}
-                      style={{
-                        width: '115px',
-                        height: '115px',
-                        borderRadius: '50%',
-                        objectFit: 'cover',
-                        margin: '0 auto 0.9rem',
-                        border: '2.5px solid var(--accent-secondary)'
-                      }}
-                    />
+                    <div style={{ width: '130px', height: '150px', margin: '0 auto 0.95rem' }}>
+                      <PositionedImage
+                        src={member.photo}
+                        alt={member.name}
+                        crop={member.photoCrop}
+                        height="150px"
+                        borderRadius="80px 80px 14px 14px"
+                        border="2px solid var(--accent-secondary)"
+                      />
+                    </div>
                   )}
                   {member.role && <span className="role-badge">{member.role}</span>}
                   <h4 style={{ fontSize: '1.45rem', marginBottom: '0.2rem' }}>{member.name}</h4>
@@ -320,6 +416,7 @@ export default function PageBlockRenderer({
               <div className="section-header-box" style={{ marginBottom: '1.75rem' }}>
                 {block.kicker && <span className="section-kicker">{block.kicker}</span>}
                 {block.title && <h3 className="section-title" style={{ fontSize: '2.35rem' }}>{block.title}</h3>}
+                <GothicRoseArchOrnament />
                 {block.subtitle && <p className="section-subtitle">{block.subtitle}</p>}
               </div>
             )}
@@ -328,25 +425,22 @@ export default function PageBlockRenderer({
                 <div
                   key={photo.id || idx}
                   style={{
-                    borderRadius: '18px',
+                    borderRadius: '120px 120px 16px 16px',
                     overflow: 'hidden',
-                    border: '1px solid var(--border-gold)',
+                    border: '1.5px solid var(--border-gold)',
                     background: 'var(--bg-card)',
                     boxShadow: 'var(--shadow-soft)'
                   }}
                 >
-                  <img
+                  <PositionedImage
                     src={photo.url}
                     alt={photo.caption || 'Wedding Gallery'}
-                    style={{
-                      width: '100%',
-                      height: settings.aspectRatio === 'portrait' ? '320px' : settings.aspectRatio === 'square' ? '260px' : '230px',
-                      objectFit: 'cover',
-                      display: 'block'
-                    }}
+                    crop={photo.urlCrop}
+                    height={settings.aspectRatio === 'portrait' ? '320px' : settings.aspectRatio === 'square' ? '260px' : '240px'}
+                    borderRadius="0px"
                   />
                   {photo.caption && (
-                    <div style={{ padding: '0.75rem 1rem', fontSize: '0.84rem', color: 'var(--text-secondary)', textAlign: 'center' }}>
+                    <div style={{ padding: '0.8rem 1rem', fontSize: '0.84rem', color: 'var(--text-secondary)', textAlign: 'center' }}>
                       {photo.caption}
                     </div>
                   )}
@@ -358,11 +452,15 @@ export default function PageBlockRenderer({
 
       case 'venue_showcase': {
         const imgBlock = (
-          <div style={{ minHeight: '360px', position: 'relative' }}>
-            <img
+          <div style={{ minHeight: '360px', position: 'relative', padding: '1.15rem' }}>
+            <PositionedImage
               src={settings.heroImage}
               alt={settings.venueName}
-              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              crop={settings.heroImageCrop}
+              height="100%"
+              borderRadius="180px 180px 16px 16px"
+              border="1.5px solid var(--border-gold)"
+              style={{ minHeight: '350px' }}
             />
           </div>
         );
@@ -450,6 +548,7 @@ export default function PageBlockRenderer({
               <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
                 {block.kicker && <span className="section-kicker">{block.kicker}</span>}
                 {block.title && <h3 style={{ fontSize: '2.15rem' }}>{block.title}</h3>}
+                <GothicRoseArchOrnament />
                 {block.subtitle && <p style={{ color: 'var(--text-secondary)', fontSize: '0.94rem', marginTop: '0.3rem' }}>{block.subtitle}</p>}
               </div>
             )}
@@ -459,9 +558,9 @@ export default function PageBlockRenderer({
                   key={step.id || idx}
                   style={{
                     background: 'var(--bg-secondary)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '16px',
-                    padding: '1.5rem'
+                    border: '1px solid var(--border-gold)',
+                    borderRadius: '44px 44px 16px 16px',
+                    padding: '1.65rem 1.5rem'
                   }}
                 >
                   {(step.badge || step.time) && <span className="role-badge">{step.badge || step.time}</span>}
@@ -480,16 +579,17 @@ export default function PageBlockRenderer({
               <div className="section-header-box" style={{ marginBottom: '1.75rem' }}>
                 {block.kicker && <span className="section-kicker">{block.kicker}</span>}
                 {block.title && <h3 className="section-title" style={{ fontSize: '2.25rem' }}>{block.title}</h3>}
+                <GothicRoseArchOrnament />
               </div>
             )}
             <div className={getGridClass(settings.columns || 3)}>
               {items.map((card, idx) => (
-                <div key={card.id || idx} className="surface-card">
+                <div key={card.id || idx} className="surface-card" style={{ borderRadius: '48px 48px 20px 20px' }}>
                   <div
                     style={{
-                      width: '44px',
-                      height: '44px',
-                      borderRadius: '12px',
+                      width: '46px',
+                      height: '46px',
+                      borderRadius: '22px 22px 10px 10px',
                       background: 'var(--bg-accent-subtle)',
                       border: '1px solid var(--border-gold)',
                       color: 'var(--accent-secondary)',
@@ -516,6 +616,7 @@ export default function PageBlockRenderer({
             <div style={{ textAlign: 'center', maxWidth: '680px', margin: '0 auto 2rem' }}>
               {block.kicker && <span className="section-kicker">{block.kicker}</span>}
               <h3 style={{ fontSize: '2.2rem', marginBottom: '0.35rem' }}>{block.title || 'Reception Dinner Menu'}</h3>
+              <GothicRoseArchOrnament />
               {block.subtitle && (
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.94rem' }}>{block.subtitle}</p>
               )}
@@ -527,8 +628,8 @@ export default function PageBlockRenderer({
                   style={{
                     background: 'var(--bg-secondary)',
                     border: '1.5px solid var(--border-gold)',
-                    borderRadius: '18px',
-                    padding: '1.6rem',
+                    borderRadius: '55px 55px 18px 18px',
+                    padding: '1.75rem 1.55rem',
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'space-between'
@@ -554,6 +655,7 @@ export default function PageBlockRenderer({
             <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
               {block.kicker && <span className="section-kicker">{block.kicker}</span>}
               <h3 style={{ fontSize: '2.1rem' }}>{block.title || 'Schedule of Events'}</h3>
+              <GothicRoseArchOrnament />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
               {items.map((event, idx) => (
@@ -589,6 +691,7 @@ export default function PageBlockRenderer({
             <div className="section-header-box" style={{ marginBottom: '1.75rem' }}>
               {block.kicker && <span className="section-kicker">{block.kicker}</span>}
               <h3 className="section-title" style={{ fontSize: '2.3rem' }}>{block.title || 'Accommodations'}</h3>
+              <GothicRoseArchOrnament />
               {block.subtitle && <p className="section-subtitle">{block.subtitle}</p>}
             </div>
             <div className={getGridClass(settings.columns || 2)}>
@@ -664,11 +767,15 @@ export default function PageBlockRenderer({
 
       case 'split_media': {
         const mediaSide = (
-          <div style={{ minHeight: '300px' }}>
-            <img
+          <div style={{ minHeight: '320px', padding: '1.15rem' }}>
+            <PositionedImage
               src={settings.imageUrl || 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=1000&q=80'}
               alt={block.title}
-              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              crop={settings.imageUrlCrop}
+              height="100%"
+              borderRadius="160px 160px 16px 16px"
+              border="1.5px solid var(--border-gold)"
+              style={{ minHeight: '300px' }}
             />
           </div>
         );
@@ -737,6 +844,7 @@ export default function PageBlockRenderer({
           >
             {block.kicker && <span className="section-kicker">{block.kicker}</span>}
             <h3 style={{ fontSize: '2.2rem', marginBottom: '0.6rem' }}>{block.title}</h3>
+            <GothicRoseArchOrnament />
             <p style={{ color: 'var(--text-secondary)', maxWidth: '720px', margin: settings.align === 'left' ? '0 0 1.25rem' : '0 auto 1.25rem', fontSize: '1rem', whiteSpace: 'pre-line' }}>
               {settings.bodyText || block.subtitle}
             </p>
@@ -768,6 +876,7 @@ export default function PageBlockRenderer({
       <div className="section-header-box">
         {pageData.kicker && <span className="section-kicker">{pageData.kicker}</span>}
         <h2 className="section-title">{pageData.headline}</h2>
+        <GothicRoseArchOrnament width={220} />
         {pageData.divider && <div className="goth-divider">{pageData.divider}</div>}
         {pageData.subheadline && <p className="section-subtitle">{pageData.subheadline}</p>}
       </div>
@@ -823,7 +932,7 @@ export default function PageBlockRenderer({
                   : isDragOver
                   ? '2.5px dashed var(--accent-secondary)'
                   : editMode
-                  ? '1px dashed rgba(209, 142, 71, 0.35)'
+                  ? '1px dashed rgba(212, 168, 83, 0.35)'
                   : 'none',
                 borderRadius: editMode ? '24px' : undefined,
                 padding: editMode ? '0.65rem' : 0,
@@ -831,7 +940,6 @@ export default function PageBlockRenderer({
                 cursor: editMode ? 'pointer' : 'default'
               }}
             >
-              {/* Floating Visual Drag-and-Drop Bar when inside CMS Builder */}
               {editMode && (
                 <div
                   onClick={(e) => e.stopPropagation()}
@@ -839,14 +947,14 @@ export default function PageBlockRenderer({
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    background: isSelected ? 'var(--accent-primary)' : '#0d0810',
+                    background: isSelected ? 'var(--accent-primary)' : '#0a0609',
                     border: '1px solid var(--border-gold)',
                     padding: '0.45rem 0.85rem',
                     borderRadius: '12px',
                     marginBottom: '0.65rem',
                     fontSize: '0.78rem',
                     fontWeight: 700,
-                    color: '#f4ece1'
+                    color: '#f5eee6'
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'grab' }}>
@@ -882,7 +990,7 @@ export default function PageBlockRenderer({
                       type="button"
                       title="Edit Section Properties"
                       onClick={() => onSelectBlock && onSelectBlock(block.id)}
-                      style={{ background: 'var(--accent-secondary)', border: 'none', color: '#120d14', padding: '0.28rem 0.6rem', borderRadius: '6px', cursor: 'pointer', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                      style={{ background: 'var(--accent-secondary)', border: 'none', color: '#090608', padding: '0.28rem 0.6rem', borderRadius: '6px', cursor: 'pointer', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
                     >
                       <Edit3 size={12} /> Inspect
                     </button>

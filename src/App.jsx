@@ -14,7 +14,7 @@ import CeremonyTab from './components/CeremonyTab.jsx';
 import ReceptionTab from './components/ReceptionTab.jsx';
 import RsvpTab from './components/RsvpTab.jsx';
 import CmsPortal from './components/CmsPortal.jsx';
-import { renderDynamicIcon } from './components/PageBlockRenderer.jsx';
+import { renderDynamicIcon, GothicRoseArchOrnament } from './components/PageBlockRenderer.jsx';
 
 const DEFAULT_BIG_TABS = [
   {
@@ -51,8 +51,8 @@ const DEFAULT_BIG_TABS = [
   }
 ];
 
-function applyThemeAndCustomColors(siteSettings) {
-  const theme = siteSettings?.theme || 'fall-goth';
+export function applyThemeAndCustomColors(siteSettings) {
+  const theme = siteSettings?.theme || 'cathedral-roses';
   document.documentElement.setAttribute('data-theme', theme);
   const root = document.documentElement;
   const cc = siteSettings?.customColors;
@@ -123,13 +123,14 @@ export default function App() {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '0.75rem' }}>
         <Heart size={36} color="var(--accent-secondary)" />
-        <div className="serif-font" style={{ fontSize: '1.75rem' }}>Loading Autumn Celebration...</div>
+        <div className="serif-font" style={{ fontSize: '1.75rem' }}>Loading Gothic Noir Celebration...</div>
       </div>
     );
   }
 
   const { siteSettings, aboutUs, ceremony, reception, sampleInvites } = siteData || {};
   const visibleTabs = (siteSettings?.bigTabs || DEFAULT_BIG_TABS).filter((t) => t.visible !== false);
+  const heroCrop = siteSettings?.heroBannerCrop || { x: 50, y: 50, zoom: 1 };
 
   return (
     <div className="wedding-app-wrapper">
@@ -158,26 +159,28 @@ export default function App() {
         </div>
       </div>
 
-      {/* Hero Banner */}
+      {/* Gothic Noir Cathedral Archway Hero Banner */}
       <header
         className="wedding-hero no-print"
         style={{
           backgroundImage: `url(${
             siteSettings?.heroBannerUrl ||
             'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=1800&q=85'
-          })`
+          })`,
+          backgroundPosition: `${heroCrop.x ?? 50}% ${heroCrop.y ?? 50}%`
         }}
       >
-        <div className="wedding-hero-inner">
+        <div className="hero-gothic-arch-frame">
           <span className="hero-eyebrow">
-            {siteSettings?.heroEyebrow || '✦ Autumn Twilight Celebration • Till Death Do Us Party ✦'}
+            {siteSettings?.heroEyebrow || '✦ Cathedral Roses & Twilight Vows • Till Death Do Us Party ✦'}
           </span>
           <h1 className="hero-couple-names">
             {siteSettings?.coupleNames || 'Elena Vance & Julian Sterling'}
           </h1>
+          <GothicRoseArchOrnament width={240} />
           <p className="hero-tagline">
             {siteSettings?.heroTagline ||
-              'Under the October harvest moon and falling crimson leaves, we invite you to celebrate our union.'}
+              'Beneath the stone cathedral archways and crimson baccara roses, we invite you to celebrate our union.'}
           </p>
 
           <div className="hero-meta-pills">
@@ -269,13 +272,14 @@ export default function App() {
       <footer
         className="no-print"
         style={{
-          borderTop: '1px solid var(--border-color)',
+          borderTop: '1px solid var(--border-gold)',
           background: 'var(--bg-secondary)',
-          padding: '2.5rem 1.5rem',
+          padding: '2.75rem 1.5rem',
           textAlign: 'center'
         }}
       >
-        <div className="serif-font" style={{ fontSize: '2rem', marginBottom: '0.35rem' }}>
+        <GothicRoseArchOrnament width={200} />
+        <div className="serif-font" style={{ fontSize: '2.1rem', marginBottom: '0.35rem' }}>
           {siteSettings?.coupleNames}
         </div>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1.15rem' }}>

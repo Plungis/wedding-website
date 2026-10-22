@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import QRCode from 'qrcode';
-import PageBlockRenderer from './PageBlockRenderer.jsx';
+import PageBlockRenderer, { GothicRoseArchOrnament } from './PageBlockRenderer.jsx';
+import { applyThemeAndCustomColors } from '../App.jsx';
 import {
   X,
   Lock,
   QrCode,
-  Settings,
   Heart,
   Sparkles,
   Wine,
@@ -26,19 +26,63 @@ import {
   Layout,
   Palette,
   Layers,
-  Image as ImageIcon,
   ArrowUp,
   ArrowDown,
   Upload,
   Columns,
-  CheckCircle2
+  Move,
+  ZoomIn,
+  Scissors
 } from 'lucide-react';
+
+export const GOTHIC_THEMES = [
+  {
+    id: 'cathedral-roses',
+    name: 'Cathedral Roses & Stone Archways',
+    tagline: 'Pointed gothic stone arches, blood-red Baccara roses, obsidian shadows & cathedral gilt gold.',
+    badge: 'Signature Rose & Archway Theme',
+    swatches: ['#090608', '#181016', '#8f1128', '#d4a853', '#f5eee6'],
+    previewGrad: 'linear-gradient(135deg, #090608 0%, #26121b 55%, #8f1128 100%)'
+  },
+  {
+    id: 'gothic-noir',
+    name: 'Victorian Gothic Noir & Moonlight Silver',
+    tagline: 'High-contrast cinema noir, midnight ink, dark garnet wine & sterling moonlight silver filigree.',
+    badge: 'Pure Gothic Noir',
+    swatches: ['#060608', '#13151b', '#6e1223', '#c8d0de', '#f2f4f8'],
+    previewGrad: 'linear-gradient(135deg, #060608 0%, #13151b 55%, #3d4454 100%)'
+  },
+  {
+    id: 'vampiric-velvet',
+    name: 'Crimson Velvet & Candlelit Baroque',
+    tagline: 'Decadent blackened merlot, crushed cabernet velvet, scarlet roses & warm beeswax candlelight.',
+    badge: 'Romantic Dark Opera',
+    swatches: ['#0e0507', '#210c12', '#a8132b', '#e2a84b', '#f9efe8'],
+    previewGrad: 'linear-gradient(135deg, #0e0507 0%, #33101a 55%, #a8132b 100%)'
+  },
+  {
+    id: 'witching-autumn',
+    name: 'Hollows Eve & Poison Ivy Conservatory',
+    tagline: 'Enchanted nightshade forest black, dark moss stone, burnt autumn blood-orange & antique brass.',
+    badge: 'Dark Botanical Autumn',
+    swatches: ['#070b09', '#141f1a', '#8f301c', '#cf9c46', '#f2ede2'],
+    previewGrad: 'linear-gradient(135deg, #070b09 0%, #141f1a 55%, #8f301c 100%)'
+  },
+  {
+    id: 'mourning-lace',
+    name: 'Black Lace, Withered Rose & Pewter',
+    tagline: 'Soft melancholic Victorian romance in raven silk, smoked plum-ash, dusty rose & cameo silver.',
+    badge: 'Victorian Lace & Rose',
+    swatches: ['#0b090d', '#1c1622', '#823152', '#d4b2c4', '#f4eef6'],
+    previewGrad: 'linear-gradient(135deg, #0b090d 0%, #2a1f32 55%, #823152 100%)'
+  }
+];
 
 const BLOCK_LIBRARY = [
   {
     type: 'rich_banner',
     label: 'Rich Story / Callout Banner',
-    desc: 'Full-width velvet banner with headline, text & optional CTA button',
+    desc: 'Full-width velvet banner with gothic arch ornament, headline & CTA button',
     create: () => ({
       id: `block-${Date.now()}`,
       type: 'rich_banner',
@@ -58,19 +102,20 @@ const BLOCK_LIBRARY = [
   },
   {
     type: 'split_media',
-    label: 'Split Image + Text Block',
-    desc: 'Side-by-side photo and text card (reversible left/right layout)',
+    label: 'Split Gothic Arch Image + Text Block',
+    desc: 'Side-by-side arched photo and text card (reversible left/right layout)',
     create: () => ({
       id: `block-${Date.now()}`,
       type: 'split_media',
-      kicker: 'Autumn Lookbook',
-      title: 'Velvet, Lace & Dark Botanicals',
+      kicker: 'Gothic Noir Lookbook',
+      title: 'Velvet, Lace & Baccara Roses',
       subtitle: '',
       visible: true,
       settings: {
         imagePosition: 'left',
         imageUrl: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=1000&q=80',
-        bodyText: 'We invite our guests to dress in moody autumn hues—think obsidian black, oxblood crimson, deep plum, emerald velvet, and antique gold accents.',
+        imageUrlCrop: { x: 50, y: 50, zoom: 1 },
+        bodyText: 'We invite our guests to dress in moody gothic noir & autumn hues—think obsidian black, blood-rose crimson, deep plum, emerald velvet, and antique gold.',
         buttonText: '',
         buttonTab: 'rsvp',
         buttonUrl: ''
@@ -80,8 +125,8 @@ const BLOCK_LIBRARY = [
   },
   {
     type: 'feature_grid',
-    label: 'Icon Feature Cards Grid',
-    desc: '2, 3, or 4 column cards with customizable icons & descriptions',
+    label: 'Arched Icon Feature Cards Grid',
+    desc: '2, 3, or 4 column gothic-arch cards with icons & descriptions',
     create: () => ({
       id: `block-${Date.now()}`,
       type: 'feature_grid',
@@ -94,7 +139,7 @@ const BLOCK_LIBRARY = [
           id: `fg-${Date.now()}-1`,
           icon: 'Moon',
           kicker: 'Twilight Vibes',
-          title: 'Candlelit Atmosphere',
+          title: 'Candlelit Stone Archways',
           description: 'Over 300 pillar candles illuminating the historic stone abbey and glass conservatory.'
         },
         {
@@ -116,8 +161,8 @@ const BLOCK_LIBRARY = [
   },
   {
     type: 'gallery',
-    label: 'Photo Gallery Grid',
-    desc: '2, 3, or 4 column photo gallery with captions & aspect ratio control',
+    label: 'Gothic Arch Photo Gallery Grid',
+    desc: '2, 3, or 4 column arched photo gallery with interactive crop & alignment',
     create: () => ({
       id: `block-${Date.now()}`,
       type: 'gallery',
@@ -130,16 +175,19 @@ const BLOCK_LIBRARY = [
         {
           id: `gal-${Date.now()}-1`,
           url: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=900&q=80',
+          urlCrop: { x: 50, y: 50, zoom: 1 },
           caption: 'October twilight in the woods'
         },
         {
           id: `gal-${Date.now()}-2`,
           url: 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=900&q=80',
+          urlCrop: { x: 50, y: 50, zoom: 1 },
           caption: 'At the manor gates'
         },
         {
           id: `gal-${Date.now()}-3`,
           url: 'https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&w=900&q=80',
+          urlCrop: { x: 50, y: 50, zoom: 1 },
           caption: 'Autumn leaves & celebration'
         }
       ]
@@ -164,7 +212,8 @@ const BLOCK_LIBRARY = [
           title: 'A Memorable Chapter',
           location: 'Hudson Valley, NY',
           description: 'Describe this special milestone in your story...',
-          image: 'https://images.unsplash.com/photo-1507842229356-51c61504d3ab?auto=format&fit=crop&w=900&q=80'
+          image: 'https://images.unsplash.com/photo-1507842229356-51c61504d3ab?auto=format&fit=crop&w=900&q=80',
+          imageCrop: { x: 50, y: 50, zoom: 1 }
         }
       ]
     })
@@ -172,7 +221,7 @@ const BLOCK_LIBRARY = [
   {
     type: 'order_cards',
     label: 'Event Steps / Order Cards',
-    desc: 'Time-badged cards for ceremony steps or weekend events',
+    desc: 'Time-badged gothic arch cards for ceremony steps or weekend events',
     create: () => ({
       id: `block-${Date.now()}`,
       type: 'order_cards',
@@ -258,7 +307,7 @@ const BLOCK_LIBRARY = [
   {
     type: 'venue_showcase',
     label: 'Venue Showcase & Map Card',
-    desc: 'Large split venue card with photo, 4 highlight stats & Google Maps link',
+    desc: 'Large split venue card with arched photo, 4 highlight stats & Google Maps link',
     create: () => ({
       id: `block-${Date.now()}`,
       type: 'venue_showcase',
@@ -269,6 +318,7 @@ const BLOCK_LIBRARY = [
         venueName: 'The Historic Stone Manor',
         venueAddress: '440 Old Sleepy Hollow Road, Tarrytown, NY',
         heroImage: 'https://images.unsplash.com/photo-1519225421980-715cb0215aed?auto=format&fit=crop&w=1400&q=85',
+        heroImageCrop: { x: 50, y: 50, zoom: 1 },
         imagePosition: 'left',
         mapUrl: 'https://maps.google.com',
         ctaText: 'Go to QR RSVP',
@@ -276,7 +326,7 @@ const BLOCK_LIBRARY = [
         highlights: [
           { label: 'Date', value: 'October 23, 2027' },
           { label: 'Doors Open', value: '4:30 PM' },
-          { label: 'Attire', value: 'Autumn Black-Tie' },
+          { label: 'Attire', value: 'Gothic Black-Tie' },
           { label: 'Parking', value: 'Complimentary Valet' }
         ]
       },
@@ -311,7 +361,7 @@ const BLOCK_LIBRARY = [
   {
     type: 'wedding_party',
     label: 'Wedding Party / People Grid',
-    desc: 'Circular portrait cards for bridesmaids, groomsmen, or family',
+    desc: 'Gothic-arch portrait cards for bridesmaids, groomsmen, or family',
     create: () => ({
       id: `block-${Date.now()}`,
       type: 'wedding_party',
@@ -327,7 +377,8 @@ const BLOCK_LIBRARY = [
           role: 'Wedding Party',
           relation: 'Dear Friend',
           bio: 'Short bio or favorite memory together...',
-          photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80'
+          photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80',
+          photoCrop: { x: 50, y: 30, zoom: 1 }
         }
       ]
     })
@@ -374,8 +425,28 @@ const AVAILABLE_ICONS = [
   'HelpCircle'
 ];
 
-// Helper component for URL input + Drag-and-Drop Image Upload
-function ImageFieldUploader({ label, value, onChange }) {
+// ============================================================================
+// INTERACTIVE PHOTO UPLOAD, DRAG-TO-LINE-UP & CROP STUDIO COMPONENT
+// ============================================================================
+function ImageFieldUploader({ label, value, cropValue, onChange, onCropChange }) {
+  const [showCropper, setShowCropper] = useState(false);
+  const [isDraggingImg, setIsDraggingImg] = useState(false);
+  const dragStartRef = useRef({ clientX: 0, clientY: 0, startX: 50, startY: 50 });
+
+  const x = cropValue?.x !== undefined ? Number(cropValue.x) : 50;
+  const y = cropValue?.y !== undefined ? Number(cropValue.y) : 50;
+  const zoom = cropValue?.zoom !== undefined ? Number(cropValue.zoom) : 1;
+
+  function updateCrop(partial) {
+    if (!onCropChange) return;
+    onCropChange({
+      x,
+      y,
+      zoom,
+      ...partial
+    });
+  }
+
   function handleFileChange(e) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -383,31 +454,267 @@ function ImageFieldUploader({ label, value, onChange }) {
     reader.onload = (ev) => {
       if (ev.target?.result) {
         onChange(ev.target.result);
+        setShowCropper(true);
       }
     };
     reader.readAsDataURL(file);
   }
 
+  function handleMouseDown(e) {
+    e.preventDefault();
+    setIsDraggingImg(true);
+    dragStartRef.current = {
+      clientX: e.clientX,
+      clientY: e.clientY,
+      startX: x,
+      startY: y
+    };
+  }
+
+  function handleMouseMove(e) {
+    if (!isDraggingImg) return;
+    const dx = e.clientX - dragStartRef.current.clientX;
+    const dy = e.clientY - dragStartRef.current.clientY;
+    // Dragging image right means moving focal point left (natural pan feel)
+    const nextX = Math.max(0, Math.min(100, Math.round(dragStartRef.current.startX - dx * 0.45)));
+    const nextY = Math.max(0, Math.min(100, Math.round(dragStartRef.current.startY - dy * 0.45)));
+    updateCrop({ x: nextX, y: nextY });
+  }
+
+  function handleMouseUp() {
+    setIsDraggingImg(false);
+  }
+
+  // Optional permanent pixel crop via HTML5 Canvas
+  function bakeCanvasCrop() {
+    if (!value) return;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        const outW = 800;
+        const outH = 960;
+        canvas.width = outW;
+        canvas.height = outH;
+        const ctx = canvas.getContext('2d');
+
+        const scale = Math.max(outW / img.width, outH / img.height) * zoom;
+        const scaledW = img.width * scale;
+        const scaledH = img.height * scale;
+
+        const offsetX = (outW - scaledW) * (x / 100);
+        const offsetY = (outH - scaledH) * (y / 100);
+
+        ctx.drawImage(img, offsetX, offsetY, scaledW, scaledH);
+        const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+        onChange(croppedDataUrl);
+        if (onCropChange) onCropChange({ x: 50, y: 50, zoom: 1 });
+      } catch {
+        alert('Live focal-point & zoom alignment is already saved! (External image host blocked raw pixel export, so your live pan & zoom coordinates will be used directly.)');
+      }
+    };
+    img.onerror = () => {
+      alert('Live focal-point & zoom alignment is saved!');
+    };
+    img.src = value;
+  }
+
   return (
     <div className="form-group">
       {label && <label className="form-label">{label}</label>}
-      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
         <input
           type="text"
           className="form-input"
-          placeholder="Paste image URL or upload file ->"
+          placeholder="Paste image URL or upload ->"
           value={value || ''}
           onChange={(e) => onChange(e.target.value)}
+          style={{ padding: '0.55rem 0.75rem', fontSize: '0.84rem' }}
         />
         <label
           className="btn-secondary"
           title="Upload image from your computer"
-          style={{ padding: '0.65rem 0.85rem', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+          style={{ padding: '0.55rem 0.7rem', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, fontSize: '0.78rem' }}
         >
-          <Upload size={15} /> Upload
+          <Upload size={14} /> Upload
           <input type="file" accept="image/*" onChange={handleFileChange} style={{ display: 'none' }} />
         </label>
+        {onCropChange && value && (
+          <button
+            type="button"
+            className={showCropper ? 'btn-primary' : 'btn-secondary'}
+            title="Line up, pan, zoom, or crop this photo in the portrait frame"
+            onClick={() => setShowCropper(!showCropper)}
+            style={{ padding: '0.55rem 0.7rem', whiteSpace: 'nowrap', flexShrink: 0, fontSize: '0.78rem' }}
+          >
+            <Move size={14} /> Line Up / Crop
+          </button>
+        )}
       </div>
+
+      {/* Interactive Portrait Frame Pan, Zoom & Crop Drawer */}
+      {showCropper && value && onCropChange && (
+        <div
+          style={{
+            marginTop: '0.6rem',
+            padding: '0.95rem',
+            borderRadius: '14px',
+            background: '#080508',
+            border: '1.5px solid var(--border-gold)'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.55rem' }}>
+            <span style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--accent-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              🎯 Drag Photo Inside Arch Frame to Line Up Portrait
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowCropper(false)}
+              style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.75rem' }}
+            >
+              Done
+            </button>
+          </div>
+
+          {/* Interactive Drag Viewport */}
+          <div
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            style={{
+              width: '190px',
+              height: '225px',
+              margin: '0 auto 0.85rem',
+              borderRadius: '110px 110px 14px 14px',
+              border: '2px solid var(--accent-secondary)',
+              overflow: 'hidden',
+              position: 'relative',
+              cursor: isDraggingImg ? 'grabbing' : 'grab',
+              userSelect: 'none',
+              background: '#000'
+            }}
+          >
+            <img
+              src={value}
+              alt="Crop Preview"
+              draggable={false}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                objectPosition: `${x}% ${y}%`,
+                transform: `scale(${zoom})`,
+                transformOrigin: `${x}% ${y}%`,
+                pointerEvents: 'none',
+                display: 'block'
+              }}
+            />
+            {/* Crosshair Alignment Guides */}
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                border: '1px dashed rgba(212, 168, 83, 0.35)',
+                pointerEvents: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <span
+                style={{
+                  background: 'rgba(9, 6, 8, 0.72)',
+                  color: 'var(--accent-secondary)',
+                  fontSize: '0.68rem',
+                  padding: '0.18rem 0.5rem',
+                  borderRadius: '999px',
+                  border: '1px solid var(--border-gold)'
+                }}
+              >
+                Drag to Pan ({x}%, {y}%)
+              </span>
+            </div>
+          </div>
+
+          {/* Sliders for Fine Tuning */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', fontSize: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ width: '90px', color: 'var(--text-secondary)' }}>Horizontal (X):</span>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={x}
+                onChange={(e) => updateCrop({ x: Number(e.target.value) })}
+                style={{ flex: 1, accentColor: 'var(--accent-secondary)' }}
+              />
+              <span style={{ width: '34px', textAlign: 'right' }}>{x}%</span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ width: '90px', color: 'var(--text-secondary)' }}>Vertical (Y):</span>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={y}
+                onChange={(e) => updateCrop({ y: Number(e.target.value) })}
+                style={{ flex: 1, accentColor: 'var(--accent-secondary)' }}
+              />
+              <span style={{ width: '34px', textAlign: 'right' }}>{y}%</span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ width: '90px', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                <ZoomIn size={12} /> Zoom:
+              </span>
+              <input
+                type="range"
+                min={1}
+                max={2.6}
+                step={0.05}
+                value={zoom}
+                onChange={(e) => updateCrop({ zoom: Number(e.target.value) })}
+                style={{ flex: 1, accentColor: 'var(--accent-secondary)' }}
+              />
+              <span style={{ width: '34px', textAlign: 'right' }}>{Math.round(zoom * 100)}%</span>
+            </div>
+          </div>
+
+          {/* Quick Alignment Presets & Permanent Crop Bake */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.75rem', gap: '0.4rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '0.35rem' }}>
+              <button
+                type="button"
+                className="btn-secondary"
+                style={{ padding: '0.28rem 0.55rem', fontSize: '0.72rem' }}
+                onClick={() => updateCrop({ x: 50, y: 22, zoom: 1.15 })}
+              >
+                Align Face / Top
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                style={{ padding: '0.28rem 0.55rem', fontSize: '0.72rem' }}
+                onClick={() => updateCrop({ x: 50, y: 50, zoom: 1 })}
+              >
+                Reset Center
+              </button>
+            </div>
+            <button
+              type="button"
+              className="btn-primary"
+              style={{ padding: '0.28rem 0.65rem', fontSize: '0.72rem' }}
+              onClick={bakeCanvasCrop}
+              title="Permanently crop pixels to this frame"
+            >
+              <Scissors size={12} /> Bake Crop
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -422,23 +729,18 @@ export default function CmsPortal({
   const [authenticated, setAuthenticated] = useState(false);
   const [authError, setAuthError] = useState('');
 
-  // Top-level studio mode: 'builder' | 'guests' | 'print-qrs' | 'revisions'
+  // Top-level studio mode: 'builder' | 'themes' | 'guests' | 'print-qrs' | 'revisions'
   const [studioMode, setStudioMode] = useState('builder');
 
-  // Active page inside the Visual Drag & Drop Builder: 'aboutUs' | 'ceremony' | 'reception' | 'heroTabs' | 'themeColors'
+  // Active page inside Visual Drag & Drop Builder: 'aboutUs' | 'ceremony' | 'reception' | 'heroTabs'
   const [builderPage, setBuilderPage] = useState('aboutUs');
   const [selectedBlockId, setSelectedBlockId] = useState(null);
   const [showAddBlockDrawer, setShowAddBlockDrawer] = useState(false);
 
-  // Drag-and-drop state for the left sidebar block tree
   const [treeDragIdx, setTreeDragIdx] = useState(null);
   const [treeDragOverIdx, setTreeDragOverIdx] = useState(null);
-
-  // Drag-and-drop state for items inside the right inspector
   const [itemDragIdx, setItemDragIdx] = useState(null);
   const [itemDragOverIdx, setItemDragOverIdx] = useState(null);
-
-  // Drag-and-drop state for Big Tabs
   const [tabDragIdx, setTabDragIdx] = useState(null);
 
   const [cmsDb, setCmsDb] = useState(null);
@@ -468,7 +770,6 @@ export default function CmsPortal({
     }
   }, [isOpen, authenticated]);
 
-  // Select first block automatically when switching pages in the visual builder
   useEffect(() => {
     if (!cmsDb) return;
     if (['aboutUs', 'ceremony', 'reception'].includes(builderPage)) {
@@ -490,7 +791,7 @@ export default function CmsPortal({
           nextMap[g.code] = await QRCode.toDataURL(url, {
             width: 260,
             margin: 2,
-            color: { dark: '#1e2a22', light: '#ffffff' }
+            color: { dark: '#090608', light: '#ffffff' }
           });
         } catch {
           // ignore
@@ -564,6 +865,7 @@ export default function CmsPortal({
       if (res.ok) {
         setCmsDb(data.db);
         setAnalytics(data.analytics);
+        applyThemeAndCustomColors(data.db.siteSettings);
         if (cmsDb.siteSettings?.adminPasscode) {
           setPasscode(cmsDb.siteSettings.adminPasscode);
         }
@@ -579,7 +881,6 @@ export default function CmsPortal({
     }
   }
 
-  // Page & Block Manipulation Helpers for Visual Drag-and-Drop Builder
   function updatePageField(pageKey, field, value) {
     setHasUnsavedChanges(true);
     setCmsDb((prev) => ({
@@ -847,14 +1148,15 @@ export default function CmsPortal({
             margin: 'auto',
             textAlign: 'center',
             padding: '2.5rem',
-            border: '1px solid var(--border-gold)'
+            border: '1.5px solid var(--border-gold)',
+            borderRadius: '180px 180px 22px 22px'
           }}
         >
           <div
             style={{
               width: '56px',
               height: '56px',
-              borderRadius: '16px',
+              borderRadius: '28px 28px 12px 12px',
               background: 'var(--bg-accent-subtle)',
               border: '1px solid var(--border-gold)',
               color: 'var(--accent-secondary)',
@@ -866,10 +1168,11 @@ export default function CmsPortal({
           >
             <Lock size={26} />
           </div>
-          <span className="section-kicker">Visual Drag & Drop Website Builder</span>
-          <h2 style={{ fontSize: '2.2rem', marginBottom: '0.5rem' }}>CMS & QR Guest Studio</h2>
+          <span className="section-kicker">Gothic Noir Website Studio</span>
+          <h2 style={{ fontSize: '2.2rem', marginBottom: '0.35rem' }}>CMS & Theme Builder</h2>
+          <GothicRoseArchOrnament width={170} />
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.92rem', marginBottom: '1.5rem' }}>
-            Unlock the visual drag-and-drop builder to reorder sections, add new blocks, customize colors, and manage guest QR codes.
+            Unlock the drag-and-drop builder, 5 Romantic Gothic themes, interactive portrait cropper, and guest QR studio.
           </p>
 
           <form onSubmit={handleLogin}>
@@ -898,7 +1201,7 @@ export default function CmsPortal({
                 Cancel
               </button>
               <button type="submit" className="btn-primary" style={{ flex: 2 }}>
-                Launch Drag & Drop Studio
+                Launch Gothic CMS Studio
               </button>
             </div>
           </form>
@@ -925,7 +1228,6 @@ export default function CmsPortal({
     return true;
   });
 
-  // Render deep item fields inside the Right Inspector based on block.type
   function renderInspectorItemsEditor(block) {
     const items = block.items || [];
 
@@ -953,6 +1255,7 @@ export default function CmsPortal({
             name: 'Partner Name',
             role: 'The Bride / Groom',
             photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=900&q=80',
+            photoCrop: { x: 50, y: 30, zoom: 1 },
             bio: 'Write bio here...',
             funFact: 'Fun fact...'
           };
@@ -963,7 +1266,8 @@ export default function CmsPortal({
             title: 'New Story Chapter',
             location: 'City, State',
             description: 'Tell the story of this milestone...',
-            image: 'https://images.unsplash.com/photo-1507842229356-51c61504d3ab?auto=format&fit=crop&w=900&q=80'
+            image: 'https://images.unsplash.com/photo-1507842229356-51c61504d3ab?auto=format&fit=crop&w=900&q=80',
+            imageCrop: { x: 50, y: 50, zoom: 1 }
           };
         } else if (b.type === 'wedding_party') {
           blank = {
@@ -972,12 +1276,14 @@ export default function CmsPortal({
             role: 'Bridesmaid / Groomsman',
             relation: 'Friend of the Couple',
             bio: 'How you know each other...',
-            photo: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80'
+            photo: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80',
+            photoCrop: { x: 50, y: 30, zoom: 1 }
           };
         } else if (b.type === 'gallery') {
           blank = {
             id,
             url: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=900&q=80',
+            urlCrop: { x: 50, y: 50, zoom: 1 },
             caption: 'Photo caption'
           };
         } else if (b.type === 'order_cards') {
@@ -1050,9 +1356,6 @@ export default function CmsPortal({
             <Plus size={14} /> Add Card / Item
           </button>
         </div>
-        <p style={{ fontSize: '0.76rem', color: 'var(--text-muted)', marginBottom: '0.85rem' }}>
-          Drag any card by its ⠿ handle to reorder it inside this section:
-        </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
           {items.map((item, idx) => (
@@ -1079,7 +1382,6 @@ export default function CmsPortal({
                 padding: '0.95rem'
               }}
             >
-              {/* Item Drag Header */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem', paddingBottom: '0.45rem', borderBottom: '1px solid var(--border-color)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'grab', fontWeight: 700, fontSize: '0.82rem', color: 'var(--accent-secondary)' }}>
                   <GripVertical size={15} />
@@ -1114,7 +1416,6 @@ export default function CmsPortal({
                 </div>
               </div>
 
-              {/* Fields per item type */}
               {block.type === 'couple_profiles' && (
                 <>
                   <div className="form-group">
@@ -1125,7 +1426,13 @@ export default function CmsPortal({
                     <label className="form-label">Role Badge</label>
                     <input type="text" className="form-input" value={item.role || ''} onChange={(e) => updateItem(idx, 'role', e.target.value)} />
                   </div>
-                  <ImageFieldUploader label="Portrait Photo" value={item.photo} onChange={(val) => updateItem(idx, 'photo', val)} />
+                  <ImageFieldUploader
+                    label="Portrait Photo (Click 'Line Up / Crop' to adjust face)"
+                    value={item.photo}
+                    cropValue={item.photoCrop}
+                    onChange={(val) => updateItem(idx, 'photo', val)}
+                    onCropChange={(c) => updateItem(idx, 'photoCrop', c)}
+                  />
                   <div className="form-group">
                     <label className="form-label">Bio</label>
                     <textarea rows={3} className="form-textarea" value={item.bio || ''} onChange={(e) => updateItem(idx, 'bio', e.target.value)} />
@@ -1153,7 +1460,13 @@ export default function CmsPortal({
                     <label className="form-label">Milestone Title</label>
                     <input type="text" className="form-input" value={item.title || ''} onChange={(e) => updateItem(idx, 'title', e.target.value)} />
                   </div>
-                  <ImageFieldUploader label="Milestone Photo" value={item.image} onChange={(val) => updateItem(idx, 'image', val)} />
+                  <ImageFieldUploader
+                    label="Milestone Photo"
+                    value={item.image}
+                    cropValue={item.imageCrop}
+                    onChange={(val) => updateItem(idx, 'image', val)}
+                    onCropChange={(c) => updateItem(idx, 'imageCrop', c)}
+                  />
                   <div className="form-group">
                     <label className="form-label">Story Description</label>
                     <textarea rows={2} className="form-textarea" value={item.description || ''} onChange={(e) => updateItem(idx, 'description', e.target.value)} />
@@ -1169,7 +1482,7 @@ export default function CmsPortal({
                   </div>
                   <div className="grid-2" style={{ gap: '0.6rem' }}>
                     <div className="form-group">
-                      <label className="form-label">Role (e.g. Best Man)</label>
+                      <label className="form-label">Role</label>
                       <input type="text" className="form-input" value={item.role || ''} onChange={(e) => updateItem(idx, 'role', e.target.value)} />
                     </div>
                     <div className="form-group">
@@ -1177,7 +1490,13 @@ export default function CmsPortal({
                       <input type="text" className="form-input" value={item.relation || ''} onChange={(e) => updateItem(idx, 'relation', e.target.value)} />
                     </div>
                   </div>
-                  <ImageFieldUploader label="Portrait Photo" value={item.photo} onChange={(val) => updateItem(idx, 'photo', val)} />
+                  <ImageFieldUploader
+                    label="Portrait Photo (Line Up / Crop)"
+                    value={item.photo}
+                    cropValue={item.photoCrop}
+                    onChange={(val) => updateItem(idx, 'photo', val)}
+                    onCropChange={(c) => updateItem(idx, 'photoCrop', c)}
+                  />
                   <div className="form-group">
                     <label className="form-label">Bio</label>
                     <textarea rows={2} className="form-textarea" value={item.bio || ''} onChange={(e) => updateItem(idx, 'bio', e.target.value)} />
@@ -1187,7 +1506,13 @@ export default function CmsPortal({
 
               {block.type === 'gallery' && (
                 <>
-                  <ImageFieldUploader label="Photo URL or Upload" value={item.url} onChange={(val) => updateItem(idx, 'url', val)} />
+                  <ImageFieldUploader
+                    label="Photo URL / Upload & Line Up"
+                    value={item.url}
+                    cropValue={item.urlCrop}
+                    onChange={(val) => updateItem(idx, 'url', val)}
+                    onCropChange={(c) => updateItem(idx, 'urlCrop', c)}
+                  />
                   <div className="form-group">
                     <label className="form-label">Caption</label>
                     <input type="text" className="form-input" value={item.caption || ''} onChange={(e) => updateItem(idx, 'caption', e.target.value)} />
@@ -1326,7 +1651,7 @@ export default function CmsPortal({
   }
 
   return (
-    <div className="cms-overlay" style={{ padding: '0.65rem' }}>
+    <div className="cms-overlay">
       <div
         style={{
           background: 'var(--bg-primary)',
@@ -1337,14 +1662,14 @@ export default function CmsPortal({
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
-          boxShadow: '0 25px 80px rgba(0,0,0,0.85)'
+          boxShadow: '0 25px 80px rgba(0,0,0,0.9)'
         }}
       >
         {/* TOP STUDIO BAR */}
         <header
           className="no-print"
           style={{
-            background: '#0b070d',
+            background: '#050306',
             borderBottom: '1px solid var(--border-gold)',
             padding: '0.75rem 1.35rem',
             display: 'flex',
@@ -1357,13 +1682,13 @@ export default function CmsPortal({
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Layers size={20} color="var(--accent-secondary)" />
-              <span className="goth-display" style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--text-primary)' }}>
-                DRAG & DROP WEDDING CMS STUDIO
+              <span className="goth-display" style={{ fontWeight: 700, fontSize: '1.02rem', color: 'var(--text-primary)' }}>
+                GOTHIC NOIR CMS & VISUAL BUILDER
               </span>
             </div>
 
             {/* Studio Mode Tabs */}
-            <div style={{ display: 'flex', gap: '0.4rem', background: 'var(--bg-secondary)', padding: '0.3rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+            <div style={{ display: 'flex', gap: '0.35rem', background: 'var(--bg-secondary)', padding: '0.3rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
               <button
                 type="button"
                 onClick={() => setStudioMode('builder')}
@@ -1381,7 +1706,27 @@ export default function CmsPortal({
                   gap: '0.4rem'
                 }}
               >
-                <Layout size={15} /> Visual Page Builder
+                <Layout size={15} /> Drag & Drop Builder
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setStudioMode('themes')}
+                style={{
+                  padding: '0.45rem 0.9rem',
+                  borderRadius: '9px',
+                  border: 'none',
+                  fontWeight: 700,
+                  fontSize: '0.8rem',
+                  cursor: 'pointer',
+                  background: studioMode === 'themes' ? 'var(--accent-primary)' : 'transparent',
+                  color: studioMode === 'themes' ? '#fff' : 'var(--text-secondary)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem'
+                }}
+              >
+                <Palette size={15} /> 5 Gothic Themes
               </button>
 
               <button
@@ -1401,7 +1746,7 @@ export default function CmsPortal({
                   gap: '0.4rem'
                 }}
               >
-                <QrCode size={15} /> Guest List & QR Studio ({cmsDb?.guests?.length || 0})
+                <QrCode size={15} /> Guest List & QRs ({cmsDb?.guests?.length || 0})
               </button>
 
               <button
@@ -1441,7 +1786,7 @@ export default function CmsPortal({
                   gap: '0.4rem'
                 }}
               >
-                <History size={15} /> Activity & Reset
+                <History size={15} /> Activity
               </button>
             </div>
           </div>
@@ -1470,7 +1815,7 @@ export default function CmsPortal({
               style={{
                 padding: '0.52rem 1.15rem',
                 fontSize: '0.84rem',
-                boxShadow: hasUnsavedChanges ? '0 0 18px rgba(209, 142, 71, 0.55)' : 'none'
+                boxShadow: hasUnsavedChanges ? '0 0 18px rgba(212, 168, 83, 0.6)' : 'none'
               }}
             >
               <Save size={15} /> {hasUnsavedChanges ? 'Publish Unsaved Changes *' : 'Publish All Changes Live'}
@@ -1488,21 +1833,226 @@ export default function CmsPortal({
         </header>
 
         {/* ================================================================= */}
+        {/* MODE: 5 ROMANTIC GOTHIC THEMES STUDIO                             */}
+        {/* ================================================================= */}
+        {studioMode === 'themes' && cmsDb && (
+          <div className="cms-scroll-body">
+            <div className="section-header-box" style={{ marginBottom: '2rem' }}>
+              <span className="section-kicker">Atmospheric Aesthetic Gallery</span>
+              <h2 className="section-title" style={{ fontSize: '2.4rem' }}>
+                5 Romantic Gothic Noir Themes
+              </h2>
+              <GothicRoseArchOrnament width={220} />
+              <p className="section-subtitle">
+                Click any of the 5 curated Gothic Noir & Romantic themes below to preview it immediately across your entire wedding website, then click <strong>Publish All Changes Live</strong> in the top bar.
+              </p>
+            </div>
+
+            <div className="grid-3" style={{ marginBottom: '2.5rem' }}>
+              {GOTHIC_THEMES.map((thm) => {
+                const currentTheme = cmsDb.siteSettings?.theme || 'cathedral-roses';
+                const isSelected = currentTheme === thm.id || (currentTheme === 'fall-goth' && thm.id === 'cathedral-roses');
+                return (
+                  <div
+                    key={thm.id}
+                    onClick={() => {
+                      const updatedSettings = {
+                        ...cmsDb.siteSettings,
+                        theme: thm.id,
+                        customColors: {
+                          ...(cmsDb.siteSettings.customColors || {}),
+                          enabled: false
+                        }
+                      };
+                      setHasUnsavedChanges(true);
+                      setCmsDb({ ...cmsDb, siteSettings: updatedSettings });
+                      applyThemeAndCustomColors(updatedSettings);
+                    }}
+                    style={{
+                      borderRadius: '140px 140px 20px 20px',
+                      overflow: 'hidden',
+                      border: isSelected ? '2.5px solid var(--accent-secondary)' : '1.5px solid var(--border-color)',
+                      background: 'var(--bg-card)',
+                      boxShadow: isSelected ? 'var(--shadow-elevated)' : 'var(--shadow-soft)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between'
+                    }}
+                  >
+                    {/* Archway Gradient Header Preview */}
+                    <div
+                      style={{
+                        background: thm.previewGrad,
+                        padding: '2.25rem 1.5rem 1.5rem',
+                        textAlign: 'center',
+                        borderBottom: '1px solid var(--border-gold)'
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: '0.68rem',
+                          fontFamily: 'Cinzel, serif',
+                          letterSpacing: '0.14em',
+                          textTransform: 'uppercase',
+                          padding: '0.25rem 0.75rem',
+                          borderRadius: '999px',
+                          background: 'rgba(0,0,0,0.55)',
+                          color: thm.swatches[3],
+                          border: `1px solid ${thm.swatches[3]}`
+                        }}
+                      >
+                        {thm.badge}
+                      </span>
+                      <h3
+                        className="goth-display"
+                        style={{
+                          fontSize: '1.35rem',
+                          color: thm.swatches[4],
+                          marginTop: '0.75rem',
+                          marginBottom: '0.35rem'
+                        }}
+                      >
+                        {thm.name}
+                      </h3>
+                      {/* Color Swatch Pills */}
+                      <div style={{ display: 'flex', justifyContent: 'center', gap: '0.45rem', marginTop: '0.75rem' }}>
+                        {thm.swatches.map((hex, i) => (
+                          <div
+                            key={i}
+                            title={hex}
+                            style={{
+                              width: '28px',
+                              height: '28px',
+                              borderRadius: '50%',
+                              background: hex,
+                              border: '2px solid rgba(255,255,255,0.35)',
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.5)'
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    <div style={{ padding: '1.35rem 1.5rem', textAlign: 'center' }}>
+                      <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', marginBottom: '1.1rem' }}>
+                        {thm.tagline}
+                      </p>
+                      <button
+                        type="button"
+                        className={isSelected ? 'btn-primary' : 'btn-secondary'}
+                        style={{ width: '100%' }}
+                      >
+                        {isSelected ? '✓ Active Gothic Theme' : 'Activate This Theme'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Custom Hex Color Override Card */}
+            <div className="surface-card" style={{ maxWidth: '760px', margin: '0 auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
+                <div>
+                  <h4 style={{ fontSize: '1.5rem' }}>Custom Hex Color Overrides (Optional)</h4>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                    Want to fine-tune any shade on top of the active theme? Enable custom color overrides below:
+                  </p>
+                </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: 700 }}>
+                  <input
+                    type="checkbox"
+                    checked={cmsDb.siteSettings.customColors?.enabled || false}
+                    onChange={(e) => {
+                      const updatedSettings = {
+                        ...cmsDb.siteSettings,
+                        customColors: {
+                          ...(cmsDb.siteSettings.customColors || {}),
+                          enabled: e.target.checked
+                        }
+                      };
+                      setHasUnsavedChanges(true);
+                      setCmsDb({ ...cmsDb, siteSettings: updatedSettings });
+                      applyThemeAndCustomColors(updatedSettings);
+                    }}
+                  />
+                  <span>Enable Custom Hex Colors</span>
+                </label>
+              </div>
+
+              {cmsDb.siteSettings.customColors?.enabled && (
+                <div className="grid-3">
+                  {[
+                    { key: 'bgPrimary', label: 'Main Noir Background' },
+                    { key: 'bgCard', label: 'Card Surface' },
+                    { key: 'accentPrimary', label: 'Primary Rose / Wine Accent' },
+                    { key: 'accentSecondary', label: 'Gold / Silver Filigree' },
+                    { key: 'textPrimary', label: 'Primary Alabaster Text' }
+                  ].map((clr) => (
+                    <div key={clr.key} className="form-group">
+                      <label className="form-label">{clr.label}</label>
+                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <input
+                          type="color"
+                          value={cmsDb.siteSettings.customColors?.[clr.key] || '#090608'}
+                          onChange={(e) => {
+                            const updatedSettings = {
+                              ...cmsDb.siteSettings,
+                              customColors: {
+                                ...cmsDb.siteSettings.customColors,
+                                [clr.key]: e.target.value
+                              }
+                            };
+                            setHasUnsavedChanges(true);
+                            setCmsDb({ ...cmsDb, siteSettings: updatedSettings });
+                            applyThemeAndCustomColors(updatedSettings);
+                          }}
+                          style={{ width: '42px', height: '42px', border: 'none', background: 'none', cursor: 'pointer' }}
+                        />
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={cmsDb.siteSettings.customColors?.[clr.key] || ''}
+                          onChange={(e) => {
+                            const updatedSettings = {
+                              ...cmsDb.siteSettings,
+                              customColors: {
+                                ...cmsDb.siteSettings.customColors,
+                                [clr.key]: e.target.value
+                              }
+                            };
+                            setHasUnsavedChanges(true);
+                            setCmsDb({ ...cmsDb, siteSettings: updatedSettings });
+                            applyThemeAndCustomColors(updatedSettings);
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ================================================================= */}
         {/* MODE 1: 3-PANE VISUAL DRAG & DROP PAGE BUILDER                    */}
         {/* ================================================================= */}
         {studioMode === 'builder' && cmsDb && (
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '300px 1fr 410px',
+              gridTemplateColumns: '300px 1fr 420px',
               flex: 1,
               overflow: 'hidden'
             }}
           >
-            {/* LEFT PANE: PAGE SELECTOR & DRAGGABLE SECTION BLOCK TREE */}
+            {/* LEFT PANE */}
             <aside
               style={{
-                background: '#0e0911',
+                background: '#070508',
                 borderRight: '1px solid var(--border-color)',
                 padding: '1.15rem',
                 overflowY: 'auto',
@@ -1520,8 +2070,7 @@ export default function CmsPortal({
                     { id: 'aboutUs', label: '01 • About Us Page', icon: Heart },
                     { id: 'ceremony', label: '02 • Ceremony Page', icon: Sparkles },
                     { id: 'reception', label: '03 • Reception & Menu Page', icon: Wine },
-                    { id: 'heroTabs', label: 'Hero Banner & Big Tabs Deck', icon: Layout },
-                    { id: 'themeColors', label: 'Theme & Custom Color Picker', icon: Palette }
+                    { id: 'heroTabs', label: 'Hero Archway & Big Tabs Deck', icon: Layout }
                   ].map((pg) => {
                     const IconC = pg.icon;
                     const active = builderPage === pg.id;
@@ -1535,7 +2084,7 @@ export default function CmsPortal({
                           padding: '0.68rem 0.85rem',
                           borderRadius: '10px',
                           border: active ? '1px solid var(--border-gold)' : '1px solid transparent',
-                          background: active ? 'linear-gradient(135deg, var(--accent-primary), #4d1020)' : 'var(--bg-secondary)',
+                          background: active ? 'linear-gradient(135deg, var(--accent-primary), #3d0815)' : 'var(--bg-secondary)',
                           color: active ? '#fff' : 'var(--text-secondary)',
                           fontWeight: 600,
                           fontSize: '0.84rem',
@@ -1550,10 +2099,30 @@ export default function CmsPortal({
                       </button>
                     );
                   })}
+                  <button
+                    type="button"
+                    onClick={() => setStudioMode('themes')}
+                    style={{
+                      textAlign: 'left',
+                      padding: '0.68rem 0.85rem',
+                      borderRadius: '10px',
+                      border: '1px dashed var(--border-gold)',
+                      background: 'var(--bg-accent-subtle)',
+                      color: 'var(--accent-secondary)',
+                      fontWeight: 700,
+                      fontSize: '0.84rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.55rem'
+                    }}
+                  >
+                    <Palette size={15} />
+                    <span>Explore 5 Gothic Noir Themes →</span>
+                  </button>
                 </div>
               </div>
 
-              {/* If editing About Us, Ceremony, or Reception: Show Page Header + Draggable Section Layers */}
               {isBlockPage && currentPageObj && (
                 <>
                   <div
@@ -1583,16 +2152,14 @@ export default function CmsPortal({
                       onChange={(e) => updatePageField(builderPage, 'headline', e.target.value)}
                       style={{ marginBottom: '0.45rem', padding: '0.48rem 0.7rem', fontSize: '0.86rem', fontWeight: 700 }}
                     />
-                    <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.45rem' }}>
-                      <input
-                        type="text"
-                        className="form-input"
-                        placeholder="Divider (e.g. ✦ 🥀 ✦)"
-                        value={currentPageObj.divider || ''}
-                        onChange={(e) => updatePageField(builderPage, 'divider', e.target.value)}
-                        style={{ padding: '0.45rem 0.65rem', fontSize: '0.8rem' }}
-                      />
-                    </div>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="Divider (e.g. ✦ 🥀 ✦)"
+                      value={currentPageObj.divider || ''}
+                      onChange={(e) => updatePageField(builderPage, 'divider', e.target.value)}
+                      style={{ marginBottom: '0.45rem', padding: '0.45rem 0.65rem', fontSize: '0.8rem' }}
+                    />
                     <textarea
                       rows={2}
                       className="form-textarea"
@@ -1618,11 +2185,7 @@ export default function CmsPortal({
                         <Plus size={13} /> Add Section
                       </button>
                     </div>
-                    <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginBottom: '0.65rem' }}>
-                      Grab ⠿ to drag & reorder sections, or click any section to edit its content on the right:
-                    </p>
 
-                    {/* Add Block Library Drawer */}
                     {showAddBlockDrawer && (
                       <div
                         style={{
@@ -1672,7 +2235,6 @@ export default function CmsPortal({
                       </div>
                     )}
 
-                    {/* Draggable Layer List */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
                       {currentBlocks.map((block, idx) => {
                         const isSelected = selectedBlockId === block.id;
@@ -1769,12 +2331,12 @@ export default function CmsPortal({
                   padding: '0.6rem 1rem',
                   borderRadius: '12px',
                   background: 'var(--bg-secondary)',
-                  border: '1px solid var(--border-color)',
+                  border: '1px solid var(--border-gold)',
                   fontSize: '0.8rem'
                 }}
               >
                 <span>
-                  <strong style={{ color: 'var(--accent-secondary)' }}>Interactive Visual Canvas:</strong> Drag sections directly on the page below to reorder, or click any section to inspect & edit it!
+                  <strong style={{ color: 'var(--accent-secondary)' }}>Interactive Visual Canvas:</strong> Drag sections to reorder, or click any section to inspect & line up portraits on the right!
                 </span>
                 {isBlockPage && (
                   <button
@@ -1783,7 +2345,7 @@ export default function CmsPortal({
                     style={{ padding: '0.32rem 0.75rem', fontSize: '0.76rem' }}
                     onClick={() => setShowAddBlockDrawer(true)}
                   >
-                    <Plus size={13} /> Add Block to This Page
+                    <Plus size={13} /> Add Section Block
                   </button>
                 )}
               </div>
@@ -1802,7 +2364,6 @@ export default function CmsPortal({
                   onDragReorderBlocks={(fromIdx, toIdx) => handleDragReorderBlocks(builderPage, fromIdx, toIdx)}
                 />
               ) : (
-                /* Preview Hero & Big Tabs when editing Hero/Tabs or Theme */
                 <div>
                   <header
                     className="wedding-hero"
@@ -1810,14 +2371,16 @@ export default function CmsPortal({
                       borderRadius: '20px',
                       marginBottom: '1.5rem',
                       padding: '2.5rem 1.5rem 3rem',
-                      backgroundImage: `url(${cmsDb.siteSettings?.heroBannerUrl})`
+                      backgroundImage: `url(${cmsDb.siteSettings?.heroBannerUrl})`,
+                      backgroundPosition: `${cmsDb.siteSettings?.heroBannerCrop?.x ?? 50}% ${cmsDb.siteSettings?.heroBannerCrop?.y ?? 50}%`
                     }}
                   >
-                    <div className="wedding-hero-inner">
+                    <div className="hero-gothic-arch-frame">
                       <span className="hero-eyebrow">{cmsDb.siteSettings?.heroEyebrow}</span>
-                      <h1 className="hero-couple-names" style={{ fontSize: '2.8rem' }}>
+                      <h1 className="hero-couple-names" style={{ fontSize: '2.6rem' }}>
                         {cmsDb.siteSettings?.coupleNames}
                       </h1>
+                      <GothicRoseArchOrnament width={200} />
                       <p className="hero-tagline">{cmsDb.siteSettings?.heroTagline}</p>
                     </div>
                   </header>
@@ -1842,20 +2405,19 @@ export default function CmsPortal({
             {/* RIGHT PANE: DEEP PROPERTY INSPECTOR */}
             <aside
               style={{
-                background: '#0e0911',
+                background: '#070508',
                 borderLeft: '1px solid var(--border-color)',
                 padding: '1.25rem',
                 overflowY: 'auto'
               }}
             >
-              {/* INSPECTOR FOR HERO & BIG TABS */}
               {builderPage === 'heroTabs' && (
                 <div>
                   <h4 style={{ fontSize: '1.45rem', marginBottom: '0.35rem', color: 'var(--accent-secondary)' }}>
-                    Hero Banner & Big Tabs Inspector
+                    Hero Archway & Big Tabs Inspector
                   </h4>
                   <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1.15rem' }}>
-                    Edit the main wedding header and drag-and-drop the Big Tabs navigation cards.
+                    Edit the Gothic archway header, line up the hero photo, and drag-and-drop the Big Tabs.
                   </p>
 
                   <div className="form-group">
@@ -1911,11 +2473,16 @@ export default function CmsPortal({
                   </div>
 
                   <ImageFieldUploader
-                    label="Hero Background Image"
+                    label="Hero Background Image (Upload & Line Up)"
                     value={cmsDb.siteSettings.heroBannerUrl}
+                    cropValue={cmsDb.siteSettings.heroBannerCrop}
                     onChange={(val) => {
                       setHasUnsavedChanges(true);
                       setCmsDb({ ...cmsDb, siteSettings: { ...cmsDb.siteSettings, heroBannerUrl: val } });
+                    }}
+                    onCropChange={(c) => {
+                      setHasUnsavedChanges(true);
+                      setCmsDb({ ...cmsDb, siteSettings: { ...cmsDb.siteSettings, heroBannerCrop: c } });
                     }}
                   />
 
@@ -2065,152 +2632,6 @@ export default function CmsPortal({
                 </div>
               )}
 
-              {/* INSPECTOR FOR THEME & CUSTOM COLOR PICKER */}
-              {builderPage === 'themeColors' && (
-                <div>
-                  <h4 style={{ fontSize: '1.45rem', marginBottom: '0.35rem', color: 'var(--accent-secondary)' }}>
-                    Theme & Custom Color Studio
-                  </h4>
-                  <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
-                    Choose a curated Fall Goth palette or enable custom color pickers to dial in your exact wedding colors.
-                  </p>
-
-                  <div className="form-group">
-                    <label className="form-label">Preset Palette Theme</label>
-                    <select
-                      className="form-select"
-                      value={cmsDb.siteSettings.theme || 'fall-goth'}
-                      onChange={(e) => {
-                        const nextTheme = e.target.value;
-                        document.documentElement.setAttribute('data-theme', nextTheme);
-                        setHasUnsavedChanges(true);
-                        setCmsDb({
-                          ...cmsDb,
-                          siteSettings: { ...cmsDb.siteSettings, theme: nextTheme }
-                        });
-                      }}
-                    >
-                      <option value="fall-goth">Fall Goth • Velvet Plum, Oxblood & Burnished Copper</option>
-                      <option value="victorian-noir">Victorian Noir • Midnight Manor & Antique Gold</option>
-                      <option value="harvest-twilight">Harvest Twilight • Deep Espresso, Crimson & Amber</option>
-                      <option value="sage-gold">Daylight Botanical • Sage & Champagne Gold</option>
-                    </select>
-                  </div>
-
-                  <div
-                    style={{
-                      marginTop: '1.25rem',
-                      padding: '1rem',
-                      borderRadius: '14px',
-                      background: 'var(--bg-secondary)',
-                      border: '1px solid var(--border-gold)'
-                    }}
-                  >
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.85rem' }}>
-                      <input
-                        type="checkbox"
-                        checked={cmsDb.siteSettings.customColors?.enabled || false}
-                        onChange={(e) => {
-                          setHasUnsavedChanges(true);
-                          setCmsDb({
-                            ...cmsDb,
-                            siteSettings: {
-                              ...cmsDb.siteSettings,
-                              customColors: {
-                                ...(cmsDb.siteSettings.customColors || {}),
-                                enabled: e.target.checked
-                              }
-                            }
-                          });
-                        }}
-                      />
-                      <span>Enable Custom Hex Color Overrides</span>
-                    </label>
-
-                    {cmsDb.siteSettings.customColors?.enabled && (
-                      <div className="grid-2" style={{ gap: '0.75rem' }}>
-                        {[
-                          { key: 'bgPrimary', label: 'Main Background' },
-                          { key: 'bgCard', label: 'Card Surface' },
-                          { key: 'accentPrimary', label: 'Primary Accent (Oxblood)' },
-                          { key: 'accentSecondary', label: 'Gold / Copper Highlight' },
-                          { key: 'textPrimary', label: 'Primary Text' }
-                        ].map((clr) => (
-                          <div key={clr.key} className="form-group" style={{ marginBottom: 0 }}>
-                            <label className="form-label" style={{ fontSize: '0.72rem' }}>{clr.label}</label>
-                            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-                              <input
-                                type="color"
-                                value={cmsDb.siteSettings.customColors?.[clr.key] || '#120d14'}
-                                onChange={(e) => {
-                                  setHasUnsavedChanges(true);
-                                  setCmsDb({
-                                    ...cmsDb,
-                                    siteSettings: {
-                                      ...cmsDb.siteSettings,
-                                      customColors: {
-                                        ...cmsDb.siteSettings.customColors,
-                                        [clr.key]: e.target.value
-                                      }
-                                    }
-                                  });
-                                }}
-                                style={{ width: '38px', height: '38px', border: 'none', background: 'none', cursor: 'pointer' }}
-                              />
-                              <input
-                                type="text"
-                                className="form-input"
-                                value={cmsDb.siteSettings.customColors?.[clr.key] || ''}
-                                onChange={(e) => {
-                                  setHasUnsavedChanges(true);
-                                  setCmsDb({
-                                    ...cmsDb,
-                                    siteSettings: {
-                                      ...cmsDb.siteSettings,
-                                      customColors: {
-                                        ...cmsDb.siteSettings.customColors,
-                                        [clr.key]: e.target.value
-                                      }
-                                    }
-                                  });
-                                }}
-                                style={{ padding: '0.45rem 0.6rem', fontSize: '0.82rem' }}
-                              />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="form-group" style={{ marginTop: '1.25rem' }}>
-                    <label className="form-label">Wedding Hashtag</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={cmsDb.siteSettings.hashtag || ''}
-                      onChange={(e) => {
-                        setHasUnsavedChanges(true);
-                        setCmsDb({ ...cmsDb, siteSettings: { ...cmsDb.siteSettings, hashtag: e.target.value } });
-                      }}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">Admin CMS Passcode</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={cmsDb.siteSettings.adminPasscode || ''}
-                      onChange={(e) => {
-                        setHasUnsavedChanges(true);
-                        setCmsDb({ ...cmsDb, siteSettings: { ...cmsDb.siteSettings, adminPasscode: e.target.value } });
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
-
               {/* INSPECTOR FOR SELECTED SECTION BLOCK */}
               {isBlockPage && selectedBlock && (
                 <div>
@@ -2231,7 +2652,6 @@ export default function CmsPortal({
                     </button>
                   </div>
 
-                  {/* Common Block Header Fields */}
                   {selectedBlock.type !== 'venue_showcase' && selectedBlock.type !== 'quote_countdown' && (
                     <>
                       <div className="form-group">
@@ -2264,7 +2684,6 @@ export default function CmsPortal({
                     </>
                   )}
 
-                  {/* Layout Columns Selector for Grid Blocks */}
                   {['couple_profiles', 'wedding_party', 'gallery', 'order_cards', 'feature_grid', 'dinner_menu', 'accommodations', 'faq_grid'].includes(
                     selectedBlock.type
                   ) && (
@@ -2289,7 +2708,6 @@ export default function CmsPortal({
                     </div>
                   )}
 
-                  {/* Couple Portrait Frame Style */}
                   {selectedBlock.type === 'couple_profiles' && (
                     <div className="form-group">
                       <label className="form-label">Portrait Image Frame Shape</label>
@@ -2303,14 +2721,13 @@ export default function CmsPortal({
                           })
                         }
                       >
-                        <option value="gothic-arch">Gothic Arch Frame (Fall Goth Signature)</option>
+                        <option value="gothic-arch">Cathedral Gothic Archway (Signature)</option>
                         <option value="rounded">Classic Rounded Portrait</option>
                         <option value="circle">Circular Medallion</option>
                       </select>
                     </div>
                   )}
 
-                  {/* Gallery Aspect Ratio */}
                   {selectedBlock.type === 'gallery' && (
                     <div className="form-group">
                       <label className="form-label">Photo Aspect Ratio</label>
@@ -2324,14 +2741,13 @@ export default function CmsPortal({
                           })
                         }
                       >
-                        <option value="landscape">Landscape</option>
-                        <option value="portrait">Tall Portrait</option>
-                        <option value="square">Square</option>
+                        <option value="landscape">Landscape Arch</option>
+                        <option value="portrait">Tall Cathedral Arch</option>
+                        <option value="square">Square Arch</option>
                       </select>
                     </div>
                   )}
 
-                  {/* Quote & Countdown Specific Settings */}
                   {selectedBlock.type === 'quote_countdown' && (
                     <>
                       <div className="form-group">
@@ -2392,7 +2808,6 @@ export default function CmsPortal({
                     </>
                   )}
 
-                  {/* Venue Showcase Specific Settings */}
                   {selectedBlock.type === 'venue_showcase' && (
                     <>
                       <div className="grid-2" style={{ gap: '0.6rem' }}>
@@ -2456,11 +2871,18 @@ export default function CmsPortal({
                         />
                       </div>
                       <ImageFieldUploader
-                        label="Venue Showcase Image"
+                        label="Venue Showcase Image (Line Up / Crop)"
                         value={selectedBlock.settings?.heroImage}
+                        cropValue={selectedBlock.settings?.heroImageCrop}
                         onChange={(val) =>
                           updateSelectedBlock(builderPage, (b) => {
                             b.settings = { ...(b.settings || {}), heroImage: val };
+                            return b;
+                          })
+                        }
+                        onCropChange={(c) =>
+                          updateSelectedBlock(builderPage, (b) => {
+                            b.settings = { ...(b.settings || {}), heroImageCrop: c };
                             return b;
                           })
                         }
@@ -2517,7 +2939,6 @@ export default function CmsPortal({
                     </>
                   )}
 
-                  {/* Split Media & Rich Banner Settings */}
                   {(selectedBlock.type === 'split_media' || selectedBlock.type === 'rich_banner') && (
                     <>
                       {selectedBlock.type === 'split_media' && (
@@ -2539,11 +2960,18 @@ export default function CmsPortal({
                             </select>
                           </div>
                           <ImageFieldUploader
-                            label="Feature Image"
+                            label="Feature Image (Line Up / Crop)"
                             value={selectedBlock.settings?.imageUrl}
+                            cropValue={selectedBlock.settings?.imageUrlCrop}
                             onChange={(val) =>
                               updateSelectedBlock(builderPage, (b) => {
                                 b.settings = { ...(b.settings || {}), imageUrl: val };
+                                return b;
+                              })
+                            }
+                            onCropChange={(c) =>
+                              updateSelectedBlock(builderPage, (b) => {
+                                b.settings = { ...(b.settings || {}), imageUrlCrop: c };
                                 return b;
                               })
                             }
@@ -2601,7 +3029,6 @@ export default function CmsPortal({
                     </>
                   )}
 
-                  {/* Render Draggable Sub-Items Editor */}
                   {renderInspectorItemsEditor(selectedBlock)}
                 </div>
               )}
@@ -2670,7 +3097,6 @@ export default function CmsPortal({
               </div>
             )}
 
-            {/* Toolbar */}
             <div
               className="surface-card"
               style={{
@@ -3173,9 +3599,9 @@ export default function CmsPortal({
               }}
             >
               <div>
-                <h4 style={{ fontSize: '1.5rem' }}>Ready-to-Print Wedding QR Enclosure Cards</h4>
+                <h4 style={{ fontSize: '1.5rem' }}>Ready-to-Print Gothic Arch QR Enclosure Cards</h4>
                 <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                  Print these personalized QR cards for your physical invitation envelopes, or download individual PNGs in the Guest Studio.
+                  Print these personalized arched QR cards for your physical invitation envelopes, or download individual PNGs in the Guest Studio.
                 </p>
               </div>
               <button className="btn-primary" onClick={() => window.print()}>
@@ -3234,7 +3660,7 @@ export default function CmsPortal({
                 <div>
                   <h4 style={{ fontSize: '1.5rem' }}>Recent CMS Edits & Guest RSVP Activity</h4>
                   <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
-                    Every drag-and-drop layout change and RSVP response is saved to <code>server/data/db.json</code>.
+                    All edits and guest RSVPs are stored in <code>C:\docker\wedding-website\data\db.json</code> and preserved across updates.
                   </p>
                 </div>
                 <button
@@ -3251,6 +3677,7 @@ export default function CmsPortal({
                       setCmsDb(data.db);
                       setAnalytics(data.analytics);
                       setHasUnsavedChanges(false);
+                      applyThemeAndCustomColors(data.db.siteSettings);
                       if (onContentUpdated) onContentUpdated();
                     }
                   }}
