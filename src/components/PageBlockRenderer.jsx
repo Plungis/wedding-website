@@ -451,12 +451,16 @@ export default function PageBlockRenderer({
         );
 
       case 'venue_showcase': {
+        const venueImgSrc = settings.heroImage || settings.venueImageUrl;
+        const venueImgCrop = settings.heroImageCrop || settings.venueImageCrop;
+        const addressText = settings.venueAddress || settings.address;
+
         const imgBlock = (
           <div style={{ minHeight: '360px', position: 'relative', padding: '1.15rem' }}>
             <PositionedImage
-              src={settings.heroImage}
+              src={venueImgSrc}
               alt={settings.venueName}
-              crop={settings.heroImageCrop}
+              crop={venueImgCrop}
               height="100%"
               borderRadius="180px 180px 16px 16px"
               border="1.5px solid var(--border-gold)"
@@ -468,10 +472,15 @@ export default function PageBlockRenderer({
           <div style={{ padding: '2.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             {settings.badge && <span className="role-badge" style={{ alignSelf: 'flex-start' }}>{settings.badge}</span>}
             <h3 style={{ fontSize: '2.2rem', marginBottom: '0.5rem' }}>{settings.venueName}</h3>
-            {settings.venueAddress && (
-              <p style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '1.5rem', fontSize: '0.96rem' }}>
+            {addressText && (
+              <p style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '1rem', fontSize: '0.96rem' }}>
                 <MapPin size={18} color="var(--accent-secondary)" />
-                {settings.venueAddress}
+                {addressText}
+              </p>
+            )}
+            {(settings.description || settings.attireNote) && (
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.92rem', marginBottom: '1.25rem' }}>
+                {settings.description || settings.attireNote}
               </p>
             )}
 
@@ -504,7 +513,7 @@ export default function PageBlockRenderer({
             <div style={{ display: 'flex', gap: '0.85rem', flexWrap: 'wrap' }}>
               {settings.mapUrl && (
                 <a href={settings.mapUrl} target="_blank" rel="noreferrer" className="btn-primary">
-                  <MapPin size={16} /> Open in Google Maps <ExternalLink size={14} />
+                  <MapPin size={16} /> {settings.mapButtonText || 'Open in Google Maps'} <ExternalLink size={14} />
                 </a>
               )}
               {settings.ctaText && onSelectTab && (
@@ -872,14 +881,88 @@ export default function PageBlockRenderer({
 
   return (
     <div>
-      {/* Page Top Header */}
-      <div className="section-header-box">
-        {pageData.kicker && <span className="section-kicker">{pageData.kicker}</span>}
-        <h2 className="section-title">{pageData.headline}</h2>
-        <GothicRoseArchOrnament width={220} />
-        {pageData.divider && <div className="goth-divider">{pageData.divider}</div>}
-        {pageData.subheadline && <p className="section-subtitle">{pageData.subheadline}</p>}
-      </div>
+      {/* Page Top Header (Clickable & Editable in Visual Builder!) */}
+      {(editMode || pageData.hideHeader !== true) && (
+        <div
+          onClick={(e) => {
+            if (editMode && onSelectBlock) {
+              e.stopPropagation();
+              onSelectBlock('__PAGE_HEADER__');
+            }
+          }}
+          style={{
+            position: 'relative',
+            opacity: pageData.hideHeader === true ? 0.45 : 1,
+            outline:
+              editMode && selectedBlockId === '__PAGE_HEADER__'
+                ? '2.5px solid var(--accent-secondary)'
+                : editMode
+                ? '1px dashed rgba(212, 168, 83, 0.45)'
+                : 'none',
+            borderRadius: editMode ? '22px' : undefined,
+            padding: editMode ? '0.75rem' : 0,
+            marginBottom: editMode ? '1.75rem' : undefined,
+            cursor: editMode ? 'pointer' : 'default',
+            transition: 'outline 0.15s ease'
+          }}
+        >
+          {editMode && (
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onSelectBlock) onSelectBlock('__PAGE_HEADER__');
+              }}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                background: selectedBlockId === '__PAGE_HEADER__' ? 'var(--accent-primary)' : '#0a0609',
+                border: '1px solid var(--border-gold)',
+                padding: '0.45rem 0.85rem',
+                borderRadius: '12px',
+                marginBottom: '0.65rem',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                color: '#f5eee6'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Sparkles size={15} color="var(--accent-secondary)" />
+                <span>0. PAGE TITLE & TOP HEADER (“{pageData.headline || 'Untitled Page'}”)</span>
+              </div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onSelectBlock) onSelectBlock('__PAGE_HEADER__');
+                }}
+                style={{
+                  background: 'var(--accent-secondary)',
+                  border: 'none',
+                  color: '#090608',
+                  padding: '0.28rem 0.65rem',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: 700,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.25rem'
+                }}
+              >
+                <Edit3 size={12} /> Edit Page Title
+              </button>
+            </div>
+          )}
+
+          <div className="section-header-box" style={editMode ? { marginBottom: '0.5rem' } : undefined}>
+            {pageData.kicker && <span className="section-kicker">{pageData.kicker}</span>}
+            <h2 className="section-title">{pageData.headline}</h2>
+            <GothicRoseArchOrnament width={220} />
+            {pageData.divider && <div className="goth-divider">{pageData.divider}</div>}
+            {pageData.subheadline && <p className="section-subtitle">{pageData.subheadline}</p>}
+          </div>
+        </div>
+      )}
 
       {/* Render Ordered Blocks */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2.75rem' }}>
@@ -1027,6 +1110,61 @@ export default function PageBlockRenderer({
           );
         })}
       </div>
+
+      {/* Optional Editable Bottom Page CTA Banner */}
+      {(editMode || pageData.showBottomBanner) && (
+        <div
+          onClick={(e) => {
+            if (editMode && onSelectBlock) {
+              e.stopPropagation();
+              onSelectBlock('__PAGE_HEADER__');
+            }
+          }}
+          className="surface-card"
+          style={{
+            marginTop: '2.75rem',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '1rem',
+            background: 'var(--bg-accent-subtle)',
+            border: '1px solid var(--border-gold)',
+            opacity: pageData.showBottomBanner ? 1 : 0.45,
+            cursor: editMode ? 'pointer' : 'default'
+          }}
+        >
+          <div>
+            <h4 style={{ fontSize: '1.6rem', marginBottom: '0.2rem' }}>
+              {pageData.bottomBannerTitle || 'Ready to explore the wedding night details?'}
+            </h4>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.94rem' }}>
+              {pageData.bottomBannerSubtitle ||
+                'View the ceremony schedule, reception menu, or scan your invitation QR code to RSVP.'}
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+            {(pageData.bottomPrimaryBtnText || 'Explore Ceremony') && (
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => onSelectTab && onSelectTab(pageData.bottomPrimaryBtnTab || 'ceremony')}
+              >
+                {pageData.bottomPrimaryBtnText || 'Explore Ceremony'} <ArrowRight size={16} />
+              </button>
+            )}
+            {(pageData.bottomSecondaryBtnText || 'Go to QR RSVP') && (
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => onSelectTab && onSelectTab(pageData.bottomSecondaryBtnTab || 'rsvp')}
+              >
+                {pageData.bottomSecondaryBtnText || 'Go to QR RSVP'} <ArrowRight size={16} />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

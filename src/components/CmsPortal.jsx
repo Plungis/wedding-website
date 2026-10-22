@@ -818,10 +818,13 @@ export default function CmsPortal({
 
   useEffect(() => {
     if (!cmsDb) return;
-    if (['aboutUs', 'ceremony', 'reception', 'weddingPartyPage'].includes(builderPage)) {
+    if (['aboutUs', 'ceremony', 'reception', 'rsvpPage', 'weddingPartyPage'].includes(builderPage)) {
+      if (selectedBlockId === '__PAGE_HEADER__') return;
       const blocks = cmsDb[builderPage]?.blocks || [];
       if (blocks.length > 0 && !blocks.some((b) => b.id === selectedBlockId)) {
         setSelectedBlockId(blocks[0].id);
+      } else if (blocks.length === 0) {
+        setSelectedBlockId('__PAGE_HEADER__');
       }
     }
   }, [builderPage, cmsDb, selectedBlockId]);
@@ -905,7 +908,8 @@ export default function CmsPortal({
           aboutUs: cmsDb.aboutUs,
           ceremony: cmsDb.ceremony,
           reception: cmsDb.reception,
-          weddingPartyPage: cmsDb.weddingPartyPage
+          weddingPartyPage: cmsDb.weddingPartyPage,
+          rsvpPage: cmsDb.rsvpPage
         })
       });
       const data = await res.json();
@@ -1296,7 +1300,7 @@ export default function CmsPortal({
     );
   }
 
-  const isBlockPage = ['aboutUs', 'ceremony', 'reception', 'weddingPartyPage'].includes(builderPage);
+  const isBlockPage = ['aboutUs', 'ceremony', 'reception', 'rsvpPage', 'weddingPartyPage'].includes(builderPage);
   const currentPageObj = isBlockPage ? cmsDb?.[builderPage] : null;
   const currentBlocks = currentPageObj?.blocks || [];
   const selectedBlock = currentBlocks.find((b) => b.id === selectedBlockId) || null;
@@ -2179,8 +2183,9 @@ export default function CmsPortal({
                     { id: 'aboutUs', label: '01 • About Us Page', icon: Heart },
                     { id: 'ceremony', label: '02 • Ceremony Page', icon: Sparkles },
                     { id: 'reception', label: '03 • Reception & Menu Page', icon: Wine },
+                    { id: 'rsvpPage', label: '04 • QR Code RSVP Page', icon: QrCode },
                     { id: 'weddingPartyPage', label: '05 • Wedding Party VIP Page', icon: Crown },
-                    { id: 'heroTabs', label: 'Hero Archway & Big Tabs Deck', icon: Layout }
+                    { id: 'heroTabs', label: 'Hero Archway, Top Bar & Tabs', icon: Layout }
                   ].map((pg) => {
                     const IconC = pg.icon;
                     const active = builderPage === pg.id;
@@ -2458,6 +2463,34 @@ export default function CmsPortal({
                     )}
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                      {/* 0. PAGE TITLE & TOP HEADER ITEM */}
+                      <div
+                        onClick={() => setSelectedBlockId('__PAGE_HEADER__')}
+                        style={{
+                          padding: '0.65rem 0.75rem',
+                          borderRadius: '10px',
+                          background: selectedBlockId === '__PAGE_HEADER__' ? 'var(--bg-accent-subtle)' : 'var(--bg-secondary)',
+                          border:
+                            selectedBlockId === '__PAGE_HEADER__'
+                              ? '1.5px solid var(--accent-secondary)'
+                              : '1px solid var(--border-gold)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          gap: '0.5rem'
+                        }}
+                      >
+                        <div style={{ overflow: 'hidden' }}>
+                          <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--accent-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            0. ★ Page Title: “{currentPageObj.headline || 'Untitled'}”
+                          </div>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                            PAGE TOP HEADER, SUBTITLE & BOTTOM BANNER
+                          </div>
+                        </div>
+                      </div>
+
                       {currentBlocks.map((block, idx) => {
                         const isSelected = selectedBlockId === block.id;
                         const isDragOver = treeDragOverIdx === idx;
@@ -2758,7 +2791,7 @@ export default function CmsPortal({
                     </div>
 
                     <div className="grid-2" style={{ gap: '0.6rem' }}>
-                      <div className="form-group" style={{ marginBottom: 0 }}>
+                      <div className="form-group" style={{ marginBottom: '0.55rem' }}>
                         <label className="form-label">Location Summary</label>
                         <input
                           type="text"
@@ -2770,7 +2803,7 @@ export default function CmsPortal({
                           }}
                         />
                       </div>
-                      <div className="form-group" style={{ marginBottom: 0 }}>
+                      <div className="form-group" style={{ marginBottom: '0.55rem' }}>
                         <label className="form-label">RSVP Deadline</label>
                         <div style={{ display: 'flex', gap: '0.35rem' }}>
                           <input
@@ -2796,6 +2829,60 @@ export default function CmsPortal({
                             }}
                           />
                         </div>
+                      </div>
+                    </div>
+
+                    <div className="grid-2" style={{ gap: '0.6rem' }}>
+                      <div className="form-group" style={{ marginBottom: '0.55rem' }}>
+                        <label className="form-label">Wedding Hashtag</label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={cmsDb.siteSettings.hashtag || ''}
+                          onChange={(e) => {
+                            setHasUnsavedChanges(true);
+                            setCmsDb({ ...cmsDb, siteSettings: { ...cmsDb.siteSettings, hashtag: e.target.value } });
+                          }}
+                        />
+                      </div>
+                      <div className="form-group" style={{ marginBottom: '0.55rem' }}>
+                        <label className="form-label">Top Utility Bar Subtitle</label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={cmsDb.siteSettings.topBarText ?? 'Wedding Celebration'}
+                          onChange={(e) => {
+                            setHasUnsavedChanges(true);
+                            setCmsDb({ ...cmsDb, siteSettings: { ...cmsDb.siteSettings, topBarText: e.target.value } });
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid-2" style={{ gap: '0.6rem' }}>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label">Top Bar VIP Button Text</label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={cmsDb.siteSettings.weddingPartyBtnText || 'Wedding Party Portal'}
+                          onChange={(e) => {
+                            setHasUnsavedChanges(true);
+                            setCmsDb({ ...cmsDb, siteSettings: { ...cmsDb.siteSettings, weddingPartyBtnText: e.target.value } });
+                          }}
+                        />
+                      </div>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label">Footer Motto / Quote</label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={cmsDb.siteSettings.footerText || ''}
+                          onChange={(e) => {
+                            setHasUnsavedChanges(true);
+                            setCmsDb({ ...cmsDb, siteSettings: { ...cmsDb.siteSettings, footerText: e.target.value } });
+                          }}
+                        />
                       </div>
                     </div>
                   </div>
@@ -2889,6 +2976,277 @@ export default function CmsPortal({
                       ))}
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* ALWAYS-ACCESSIBLE PAGE TITLE & TOP HEADER INSPECTOR ON RIGHT PANE */}
+              {isBlockPage && currentPageObj && (
+                <div
+                  style={{
+                    background:
+                      selectedBlockId === '__PAGE_HEADER__' || !selectedBlock
+                        ? 'var(--bg-accent-subtle)'
+                        : 'var(--bg-secondary)',
+                    border:
+                      selectedBlockId === '__PAGE_HEADER__' || !selectedBlock
+                        ? '2px solid var(--accent-secondary)'
+                        : '1.5px solid var(--border-gold)',
+                    borderRadius: '14px',
+                    padding: '1.05rem',
+                    marginBottom: '1.25rem'
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: '0.65rem'
+                    }}
+                  >
+                    <div>
+                      <span className="section-kicker" style={{ marginBottom: '0.1rem' }}>
+                        0. ★ Page Top Header & Title
+                      </span>
+                      <h4 style={{ fontSize: '1.22rem', color: 'var(--accent-secondary)' }}>
+                        Edit Page Title (“{currentPageObj.headline || 'Page Title'}”)
+                      </h4>
+                    </div>
+                    {selectedBlockId !== '__PAGE_HEADER__' && (
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        style={{ padding: '0.28rem 0.6rem', fontSize: '0.72rem' }}
+                        onClick={() => setSelectedBlockId('__PAGE_HEADER__')}
+                      >
+                        Full Header Settings
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: '0.55rem' }}>
+                    <label className="form-label">Main Page Title / Headline (e.g. “The Twilight Ceremony”)</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={currentPageObj.headline || ''}
+                      onChange={(e) => updatePageField(builderPage, 'headline', e.target.value)}
+                      style={{ fontWeight: 700, fontSize: '0.96rem', borderColor: 'var(--border-gold)' }}
+                    />
+                  </div>
+
+                  <div className="grid-2" style={{ gap: '0.55rem' }}>
+                    <div className="form-group" style={{ marginBottom: '0.55rem' }}>
+                      <label className="form-label">Small Top Eyebrow / Kicker</label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        value={currentPageObj.kicker ?? ''}
+                        onChange={(e) => updatePageField(builderPage, 'kicker', e.target.value)}
+                      />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: '0.55rem' }}>
+                      <label className="form-label">Ornamental Divider</label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="✦ 🥀 ✦ (leave blank for Rose Arch)"
+                        value={currentPageObj.divider ?? ''}
+                        onChange={(e) => updatePageField(builderPage, 'divider', e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: '0.55rem' }}>
+                    <label className="form-label">Page Intro Subtitle / Description</label>
+                    <textarea
+                      rows={2}
+                      className="form-textarea"
+                      value={currentPageObj.subheadline ?? ''}
+                      onChange={(e) => updatePageField(builderPage, 'subheadline', e.target.value)}
+                    />
+                  </div>
+
+                  {(selectedBlockId === '__PAGE_HEADER__' || !selectedBlock || builderPage === 'rsvpPage') && (
+                    <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.82rem', marginBottom: '0.75rem' }}>
+                        <input
+                          type="checkbox"
+                          checked={Boolean(currentPageObj.hideHeader)}
+                          onChange={(e) => updatePageField(builderPage, 'hideHeader', e.target.checked)}
+                        />
+                        <span>Hide Top Page Title Box on This Page</span>
+                      </label>
+
+                      {/* RSVP PAGE SPECIFIC SCANNER & CARD TEXTS */}
+                      {builderPage === 'rsvpPage' && (
+                        <div
+                          style={{
+                            background: 'var(--bg-primary)',
+                            border: '1px solid var(--border-gold)',
+                            borderRadius: '12px',
+                            padding: '0.85rem',
+                            marginBottom: '0.85rem'
+                          }}
+                        >
+                          <div className="form-label" style={{ color: 'var(--accent-secondary)', marginBottom: '0.55rem' }}>
+                            QR Scanner Banner & Invitation Code Card Texts
+                          </div>
+                          <div className="grid-2" style={{ gap: '0.5rem' }}>
+                            <div className="form-group">
+                              <label className="form-label">Scanner Pill Badge</label>
+                              <input
+                                type="text"
+                                className="form-input"
+                                value={currentPageObj.scannerBadge ?? 'Instant QR Code Access'}
+                                onChange={(e) => updatePageField('rsvpPage', 'scannerBadge', e.target.value)}
+                              />
+                            </div>
+                            <div className="form-group">
+                              <label className="form-label">Scanner Heading</label>
+                              <input
+                                type="text"
+                                className="form-input"
+                                value={currentPageObj.scannerTitle ?? 'Have Your Wedding QR Card?'}
+                                onChange={(e) => updatePageField('rsvpPage', 'scannerTitle', e.target.value)}
+                              />
+                            </div>
+                          </div>
+                          <div className="form-group">
+                            <label className="form-label">Scanner Instructions Paragraph</label>
+                            <textarea
+                              rows={2}
+                              className="form-textarea"
+                              value={currentPageObj.scannerSubtitle ?? ''}
+                              onChange={(e) => updatePageField('rsvpPage', 'scannerSubtitle', e.target.value)}
+                            />
+                          </div>
+                          <div className="grid-2" style={{ gap: '0.5rem' }}>
+                            <div className="form-group">
+                              <label className="form-label">Camera Button Text</label>
+                              <input
+                                type="text"
+                                className="form-input"
+                                value={currentPageObj.cameraBtnText ?? 'Scan QR with Camera'}
+                                onChange={(e) => updatePageField('rsvpPage', 'cameraBtnText', e.target.value)}
+                              />
+                            </div>
+                            <div className="form-group">
+                              <label className="form-label">Upload Button Text</label>
+                              <input
+                                type="text"
+                                className="form-input"
+                                value={currentPageObj.uploadBtnText ?? 'Upload QR Image'}
+                                onChange={(e) => updatePageField('rsvpPage', 'uploadBtnText', e.target.value)}
+                              />
+                            </div>
+                          </div>
+                          <div className="grid-2" style={{ gap: '0.5rem' }}>
+                            <div className="form-group">
+                              <label className="form-label">Code Box Label</label>
+                              <input
+                                type="text"
+                                className="form-input"
+                                value={currentPageObj.codeInputLabel ?? 'Enter Unique Invitation Code'}
+                                onChange={(e) => updatePageField('rsvpPage', 'codeInputLabel', e.target.value)}
+                              />
+                            </div>
+                            <div className="form-group">
+                              <label className="form-label">Unlock Button Text</label>
+                              <input
+                                type="text"
+                                className="form-input"
+                                value={currentPageObj.unlockBtnText ?? 'Unlock RSVP'}
+                                onChange={(e) => updatePageField('rsvpPage', 'unlockBtnText', e.target.value)}
+                              />
+                            </div>
+                          </div>
+                          <div className="form-group">
+                            <label className="form-label">Code Help Hint Below Input</label>
+                            <input
+                              type="text"
+                              className="form-input"
+                              value={currentPageObj.codeInputHint ?? ''}
+                              onChange={(e) => updatePageField('rsvpPage', 'codeInputHint', e.target.value)}
+                            />
+                          </div>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.82rem' }}>
+                            <input
+                              type="checkbox"
+                              checked={currentPageObj.showSampleTray !== false}
+                              onChange={(e) => updatePageField('rsvpPage', 'showSampleTray', e.target.checked)}
+                            />
+                            <span>Show Sample Guest QR Preview Tray on RSVP Page</span>
+                          </label>
+                        </div>
+                      )}
+
+                      {/* BOTTOM CALL-TO-ACTION BANNER EDITOR FOR ANY PAGE */}
+                      <div
+                        style={{
+                          background: 'var(--bg-primary)',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: '12px',
+                          padding: '0.85rem'
+                        }}
+                      >
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 700, color: 'var(--accent-secondary)', marginBottom: '0.55rem' }}>
+                          <input
+                            type="checkbox"
+                            checked={Boolean(currentPageObj.showBottomBanner)}
+                            onChange={(e) => updatePageField(builderPage, 'showBottomBanner', e.target.checked)}
+                          />
+                          <span>Show Bottom Call-to-Action Banner on This Page</span>
+                        </label>
+
+                        {currentPageObj.showBottomBanner && (
+                          <>
+                            <div className="form-group">
+                              <label className="form-label">Bottom Banner Title</label>
+                              <input
+                                type="text"
+                                className="form-input"
+                                value={currentPageObj.bottomBannerTitle ?? 'Join Us Under the October Moon'}
+                                onChange={(e) => updatePageField(builderPage, 'bottomBannerTitle', e.target.value)}
+                              />
+                            </div>
+                            <div className="form-group">
+                              <label className="form-label">Bottom Banner Subtitle</label>
+                              <textarea
+                                rows={2}
+                                className="form-textarea"
+                                value={
+                                  currentPageObj.bottomBannerSubtitle ??
+                                  'Explore our candlelit ceremony details, autumn feast menu, or scan your invitation QR code to RSVP.'
+                                }
+                                onChange={(e) => updatePageField(builderPage, 'bottomBannerSubtitle', e.target.value)}
+                              />
+                            </div>
+                            <div className="grid-2" style={{ gap: '0.5rem' }}>
+                              <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label className="form-label">Button 1 Text</label>
+                                <input
+                                  type="text"
+                                  className="form-input"
+                                  value={currentPageObj.bottomBannerPrimaryText ?? 'View Twilight Ceremony'}
+                                  onChange={(e) => updatePageField(builderPage, 'bottomBannerPrimaryText', e.target.value)}
+                                />
+                              </div>
+                              <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label className="form-label">Button 2 Text</label>
+                                <input
+                                  type="text"
+                                  className="form-input"
+                                  value={currentPageObj.bottomBannerSecondaryText ?? 'Open QR Code RSVP'}
+                                  onChange={(e) => updatePageField(builderPage, 'bottomBannerSecondaryText', e.target.value)}
+                                />
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -3184,10 +3542,25 @@ export default function CmsPortal({
                         <input
                           type="text"
                           className="form-input"
-                          value={selectedBlock.settings?.venueAddress || ''}
+                          value={selectedBlock.settings?.venueAddress || selectedBlock.settings?.address || ''}
                           onChange={(e) =>
                             updateSelectedBlock(builderPage, (b) => {
-                              b.settings = { ...(b.settings || {}), venueAddress: e.target.value };
+                              b.settings = { ...(b.settings || {}), venueAddress: e.target.value, address: e.target.value };
+                              return b;
+                            })
+                          }
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Venue Description / Notes Paragraph (Optional)</label>
+                        <textarea
+                          rows={2}
+                          className="form-textarea"
+                          placeholder="Add optional notes about the venue, attire, or arrival..."
+                          value={selectedBlock.settings?.description || selectedBlock.settings?.attireNote || ''}
+                          onChange={(e) =>
+                            updateSelectedBlock(builderPage, (b) => {
+                              b.settings = { ...(b.settings || {}), description: e.target.value, attireNote: e.target.value };
                               return b;
                             })
                           }
@@ -3195,39 +3568,106 @@ export default function CmsPortal({
                       </div>
                       <ImageFieldUploader
                         label="Venue Showcase Image (Line Up / Crop)"
-                        value={selectedBlock.settings?.heroImage}
-                        cropValue={selectedBlock.settings?.heroImageCrop}
+                        value={selectedBlock.settings?.heroImage || selectedBlock.settings?.venueImageUrl}
+                        cropValue={selectedBlock.settings?.heroImageCrop || selectedBlock.settings?.venueImageCrop}
                         onChange={(val) =>
                           updateSelectedBlock(builderPage, (b) => {
-                            b.settings = { ...(b.settings || {}), heroImage: val };
+                            b.settings = { ...(b.settings || {}), heroImage: val, venueImageUrl: val };
                             return b;
                           })
                         }
                         onCropChange={(c) =>
                           updateSelectedBlock(builderPage, (b) => {
-                            b.settings = { ...(b.settings || {}), heroImageCrop: c };
+                            b.settings = { ...(b.settings || {}), heroImageCrop: c, venueImageCrop: c };
                             return b;
                           })
                         }
                       />
-                      <div className="form-group">
-                        <label className="form-label">Google Maps Link</label>
-                        <input
-                          type="text"
-                          className="form-input"
-                          value={selectedBlock.settings?.mapUrl || ''}
-                          onChange={(e) =>
-                            updateSelectedBlock(builderPage, (b) => {
-                              b.settings = { ...(b.settings || {}), mapUrl: e.target.value };
-                              return b;
-                            })
-                          }
-                        />
+                      <div className="grid-2" style={{ gap: '0.5rem' }}>
+                        <div className="form-group">
+                          <label className="form-label">Google Maps Link</label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            value={selectedBlock.settings?.mapUrl || ''}
+                            onChange={(e) =>
+                              updateSelectedBlock(builderPage, (b) => {
+                                b.settings = { ...(b.settings || {}), mapUrl: e.target.value };
+                                return b;
+                              })
+                            }
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label">Maps Button Label</label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            value={selectedBlock.settings?.mapButtonText ?? 'Open in Google Maps'}
+                            onChange={(e) =>
+                              updateSelectedBlock(builderPage, (b) => {
+                                b.settings = { ...(b.settings || {}), mapButtonText: e.target.value };
+                                return b;
+                              })
+                            }
+                          />
+                        </div>
+                      </div>
+                      <div className="grid-2" style={{ gap: '0.5rem' }}>
+                        <div className="form-group">
+                          <label className="form-label">2nd Action Button Text</label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            placeholder="e.g. See Reception Details"
+                            value={selectedBlock.settings?.ctaText ?? ''}
+                            onChange={(e) =>
+                              updateSelectedBlock(builderPage, (b) => {
+                                b.settings = { ...(b.settings || {}), ctaText: e.target.value };
+                                return b;
+                              })
+                            }
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label">2nd Button Target Tab</label>
+                          <select
+                            className="form-select"
+                            value={selectedBlock.settings?.ctaTargetTab || 'reception'}
+                            onChange={(e) =>
+                              updateSelectedBlock(builderPage, (b) => {
+                                b.settings = { ...(b.settings || {}), ctaTargetTab: e.target.value };
+                                return b;
+                              })
+                            }
+                          >
+                            <option value="about">About Us Tab</option>
+                            <option value="ceremony">Ceremony Tab</option>
+                            <option value="reception">Reception Tab</option>
+                            <option value="rsvp">QR Code RSVP Tab</option>
+                          </select>
+                        </div>
                       </div>
                       <div className="form-group">
-                        <label className="form-label">4 Key Highlight Stats</label>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem' }}>
+                          <label className="form-label" style={{ margin: 0 }}>Key Highlight Stats</label>
+                          <button
+                            type="button"
+                            className="btn-secondary"
+                            style={{ padding: '0.22rem 0.55rem', fontSize: '0.72rem' }}
+                            onClick={() =>
+                              updateSelectedBlock(builderPage, (b) => {
+                                const nextH = [...(b.settings?.highlights || []), { label: 'Highlight', value: 'Details' }];
+                                b.settings = { ...(b.settings || {}), highlights: nextH };
+                                return b;
+                              })
+                            }
+                          >
+                            <Plus size={12} /> Add Stat
+                          </button>
+                        </div>
                         {(selectedBlock.settings?.highlights || []).map((hl, hIdx) => (
-                          <div key={hIdx} className="grid-2" style={{ gap: '0.5rem', marginBottom: '0.45rem' }}>
+                          <div key={hIdx} style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.45rem', alignItems: 'center' }}>
                             <input
                               type="text"
                               className="form-input"
@@ -3256,6 +3696,20 @@ export default function CmsPortal({
                                 })
                               }
                             />
+                            <button
+                              type="button"
+                              title="Remove Stat"
+                              onClick={() =>
+                                updateSelectedBlock(builderPage, (b) => {
+                                  const nextH = (b.settings?.highlights || []).filter((_, i) => i !== hIdx);
+                                  b.settings = { ...b.settings, highlights: nextH };
+                                  return b;
+                                })
+                              }
+                              style={{ background: 'rgba(220,38,38,0.2)', border: 'none', color: '#fca5a5', padding: '0.35rem 0.45rem', borderRadius: '6px', cursor: 'pointer' }}
+                            >
+                              <Trash2 size={12} />
+                            </button>
                           </div>
                         ))}
                       </div>

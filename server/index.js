@@ -114,6 +114,11 @@ function loadDatabase() {
         ...structuredClone(defaultDatabase.weddingPartyPage),
         ...(parsed.weddingPartyPage || {}),
         blocks: parsed.weddingPartyPage?.blocks || structuredClone(defaultDatabase.weddingPartyPage.blocks)
+      },
+      rsvpPage: {
+        ...structuredClone(defaultDatabase.rsvpPage),
+        ...(parsed.rsvpPage || {}),
+        blocks: parsed.rsvpPage?.blocks || structuredClone(defaultDatabase.rsvpPage.blocks)
       }
     };
     if (!merged.siteSettings.theme || merged.siteSettings.theme === 'fall-goth') {
@@ -244,6 +249,7 @@ app.get('/api/content', (req, res) => {
     ceremony: db.ceremony,
     reception: db.reception,
     weddingPartyPage: db.weddingPartyPage,
+    rsvpPage: db.rsvpPage,
     sampleInvites
   });
 });
@@ -382,11 +388,11 @@ app.get('/api/admin/data', requireAdmin, (req, res) => {
   });
 });
 
-// 6. Update CMS Section (siteSettings, aboutUs, ceremony, reception, weddingPartyPage)
+// 6. Update CMS Section (siteSettings, aboutUs, ceremony, reception, weddingPartyPage, rsvpPage)
 app.put('/api/admin/section/:sectionName', requireAdmin, (req, res) => {
   const db = req.db;
   const { sectionName } = req.params;
-  const allowedSections = ['siteSettings', 'aboutUs', 'ceremony', 'reception', 'weddingPartyPage'];
+  const allowedSections = ['siteSettings', 'aboutUs', 'ceremony', 'reception', 'weddingPartyPage', 'rsvpPage'];
 
   if (!allowedSections.includes(sectionName)) {
     return res.status(400).json({ error: `Invalid section: ${sectionName}` });
@@ -406,13 +412,14 @@ app.put('/api/admin/section/:sectionName', requireAdmin, (req, res) => {
 // 6b. Publish Full CMS State (All Pages + Site Settings at once)
 app.put('/api/admin/publish-all', requireAdmin, (req, res) => {
   const db = req.db;
-  const { siteSettings, aboutUs, ceremony, reception, weddingPartyPage } = req.body || {};
+  const { siteSettings, aboutUs, ceremony, reception, weddingPartyPage, rsvpPage } = req.body || {};
 
   if (siteSettings) db.siteSettings = siteSettings;
   if (aboutUs) db.aboutUs = aboutUs;
   if (ceremony) db.ceremony = ceremony;
   if (reception) db.reception = reception;
   if (weddingPartyPage) db.weddingPartyPage = weddingPartyPage;
+  if (rsvpPage) db.rsvpPage = rsvpPage;
 
   syncReceptionMenuOptions(db);
   saveDatabase(db, 'Published visual drag-and-drop changes across website sections', 'visual-builder');

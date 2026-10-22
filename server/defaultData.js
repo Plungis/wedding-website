@@ -22,6 +22,8 @@ export const defaultDatabase = {
     heroBannerUrl: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1800&q=85",
     heroBannerCrop: { x: 50, y: 40, zoom: 1 },
     heroTagline: "Beneath pointed cathedral archways, dark Baccara roses, and the October moon, we invite you to celebrate our union.",
+    topBarText: "Wedding Celebration",
+    weddingPartyBtnText: "Wedding Party Portal",
     footerText: "Forever & Always Beneath the October Moon",
     bigTabs: [
       {
@@ -63,6 +65,13 @@ export const defaultDatabase = {
     headline: "Our Story & Kindred Spirits",
     subheadline: "Seven autumns of midnight coffee, rain-slicked cobblestones, vintage vinyl, and one forever ahead.",
     divider: "✦ 🍂 ✦",
+    showBottomBanner: true,
+    bottomBannerTitle: "Join Us Under the October Moon",
+    bottomBannerSubtitle: "Explore our candlelit ceremony details, autumn feast menu, or scan your invitation QR code to RSVP.",
+    bottomBannerPrimaryText: "View Twilight Ceremony",
+    bottomBannerPrimaryTab: "ceremony",
+    bottomBannerSecondaryText: "Open QR Code RSVP",
+    bottomBannerSecondaryTab: "rsvp",
     blocks: [
       {
         id: "block-quote-countdown",
@@ -669,6 +678,25 @@ export const defaultDatabase = {
         ]
       }
     ]
+  },
+  rsvpPage: {
+    kicker: "04 • Personalized QR Invitation",
+    headline: "Respond to Your Invitation",
+    subheadline: "Scan the unique QR code included with your wedding invitation—or enter your personal invitation code below—to unlock your household’s RSVP card.",
+    divider: "✦ 🌙 ✦",
+    scannerBadge: "Instant QR Code Access",
+    scannerTitle: "Have Your Wedding QR Card?",
+    scannerSubtitle: "Point your phone’s camera at the QR code on your paper invitation to open your RSVP automatically, use our built-in camera scanner, or type your personal invitation code.",
+    cameraBtnText: "Scan QR with Camera",
+    uploadBtnText: "Upload QR Image",
+    codeInputLabel: "Enter Unique Invitation Code",
+    codeInputPlaceholder: "e.g. ROSE-4829",
+    unlockBtnText: "Unlock RSVP",
+    codeInputHint: "Your unique code is printed directly below the QR square on your physical RSVP insert card.",
+    showSampleTray: true,
+    sampleTrayTitle: "Interactive Guest QR Code Preview Tray",
+    sampleTraySubtitle: "Scan any QR below with your phone camera or click a guest card to test their personalized RSVP view:",
+    blocks: []
   },
   guests: [
     {

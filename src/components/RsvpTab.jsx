@@ -18,6 +18,7 @@ import {
   UserPlus,
   Crown
 } from 'lucide-react';
+import PageBlockRenderer, { GothicRoseArchOrnament } from './PageBlockRenderer.jsx';
 
 function extractCodeFromRawText(rawText = '') {
   const trimmed = rawText.trim();
@@ -38,6 +39,8 @@ function extractCodeFromRawText(rawText = '') {
 }
 
 export default function RsvpTab({
+  rsvpPage,
+  siteSettings,
   initialCode,
   sampleInvites = [],
   menuOptions = [],
@@ -304,15 +307,28 @@ export default function RsvpTab({
 
   return (
     <div className="rsvp-tab-content">
-      <div className="section-header-box">
-        <span className="section-kicker">04 • Personalized QR Invitation</span>
-        <h2 className="section-title">Respond to Your Invitation</h2>
-        <div className="goth-divider">✦ 🌙 ✦</div>
-        <p className="section-subtitle">
-          Scan the unique QR code included with your wedding invitation—or enter your personal invitation code below—to unlock your household’s RSVP card.
-          {rsvpDeadline ? ` Kindly respond by ${rsvpDeadline}.` : ''}
-        </p>
-      </div>
+      {!rsvpPage?.hideHeader && (
+        <div className="section-header-box">
+          {rsvpPage?.kicker !== '' && (
+            <span className="section-kicker">
+              {rsvpPage?.kicker ?? '04 • Personalized QR Invitation'}
+            </span>
+          )}
+          <h2 className="section-title">
+            {rsvpPage?.headline || 'Respond to Your Invitation'}
+          </h2>
+          {rsvpPage?.divider ? (
+            <div className="goth-divider">{rsvpPage.divider}</div>
+          ) : (
+            <GothicRoseArchOrnament width={210} />
+          )}
+          <p className="section-subtitle">
+            {rsvpPage?.subheadline ??
+              'Scan the unique QR code included with your wedding invitation—or enter your personal invitation code below—to unlock your household’s RSVP card.'}
+            {rsvpDeadline ? ` Kindly respond by ${rsvpDeadline}.` : ''}
+          </p>
+        </div>
+      )}
 
       {/* QR Code Lookup & Scanner Banner */}
       <div className="qr-lookup-banner" style={{ marginBottom: '2rem' }}>
@@ -325,14 +341,17 @@ export default function RsvpTab({
           }}
         >
           <div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(209, 142, 71, 0.18)', border: '1px solid var(--border-gold)', color: 'var(--accent-secondary)', padding: '0.35rem 0.85rem', borderRadius: '999px', fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '0.85rem' }}>
-              <QrCode size={15} /> Instant QR Code Access
-            </div>
+            {(rsvpPage?.scannerBadge ?? 'Instant QR Code Access') && (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(209, 142, 71, 0.18)', border: '1px solid var(--border-gold)', color: 'var(--accent-secondary)', padding: '0.35rem 0.85rem', borderRadius: '999px', fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '0.85rem' }}>
+                <QrCode size={15} /> {rsvpPage?.scannerBadge ?? 'Instant QR Code Access'}
+              </div>
+            )}
             <h3 style={{ fontSize: '2.1rem', marginBottom: '0.5rem', color: '#f9f3eb' }}>
-              Have Your Wedding QR Card?
+              {rsvpPage?.scannerTitle || 'Have Your Wedding QR Card?'}
             </h3>
             <p style={{ color: 'rgba(244, 236, 225, 0.86)', fontSize: '0.94rem', marginBottom: '1.25rem' }}>
-              Point your phone’s camera at the QR code on your paper invitation to open your RSVP automatically, use our built-in camera scanner, or type your 9-character code (e.g., <strong>ROSE-4829</strong>).
+              {rsvpPage?.scannerSubtitle ||
+                'Point your phone’s camera at the QR code on your paper invitation to open your RSVP automatically, use our built-in camera scanner, or type your personal invitation code.'}
             </p>
 
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -342,7 +361,7 @@ export default function RsvpTab({
                   onClick={startCameraScanner}
                   className="btn-primary"
                 >
-                  <Camera size={17} /> Scan QR with Camera
+                  <Camera size={17} /> {rsvpPage?.cameraBtnText || 'Scan QR with Camera'}
                 </button>
               ) : (
                 <button
@@ -363,7 +382,7 @@ export default function RsvpTab({
                   cursor: 'pointer'
                 }}
               >
-                <Upload size={17} /> Upload QR Image
+                <Upload size={17} /> {rsvpPage?.uploadBtnText || 'Upload QR Image'}
                 <input
                   type="file"
                   accept="image/*"
@@ -390,13 +409,13 @@ export default function RsvpTab({
             }}
           >
             <label className="form-label" style={{ display: 'block', marginBottom: '0.5rem' }}>
-              Enter Unique Invitation Code
+              {rsvpPage?.codeInputLabel || 'Enter Unique Invitation Code'}
             </label>
             <div style={{ display: 'flex', gap: '0.6rem' }}>
               <input
                 type="text"
                 className="form-input"
-                placeholder="e.g. ROSE-4829"
+                placeholder={rsvpPage?.codeInputPlaceholder || 'e.g. ROSE-4829'}
                 value={inputCode}
                 onChange={(e) => setInputCode(e.target.value.toUpperCase())}
                 style={{
@@ -407,11 +426,12 @@ export default function RsvpTab({
                 }}
               />
               <button type="submit" className="btn-primary" disabled={loading} style={{ whiteSpace: 'nowrap' }}>
-                <Search size={17} /> {loading ? 'Checking...' : 'Unlock RSVP'}
+                <Search size={17} /> {loading ? 'Checking...' : rsvpPage?.unlockBtnText || 'Unlock RSVP'}
               </button>
             </div>
             <p style={{ fontSize: '0.79rem', color: 'var(--text-muted)', marginTop: '0.65rem' }}>
-              Your unique code is printed directly below the QR square on your physical RSVP insert card.
+              {rsvpPage?.codeInputHint ??
+                'Your unique code is printed directly below the QR square on your physical RSVP insert card.'}
             </p>
           </form>
         </div>
@@ -451,7 +471,7 @@ export default function RsvpTab({
       </div>
 
       {/* Interactive Demo QR Tray so the user can test scanning or clicking sample guest QR codes */}
-      {sampleInvites.length > 0 && (
+      {sampleInvites.length > 0 && rsvpPage?.showSampleTray !== false && (
         <div
           className="surface-card"
           style={{
@@ -465,9 +485,12 @@ export default function RsvpTab({
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <QrCode size={19} color="var(--accent-primary)" />
               <div>
-                <strong style={{ fontSize: '0.95rem' }}>Interactive Guest QR Code Preview Tray</strong>
+                <strong style={{ fontSize: '0.95rem' }}>
+                  {rsvpPage?.sampleTrayTitle || 'Interactive Guest QR Code Preview Tray'}
+                </strong>
                 <span style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', marginLeft: '0.6rem' }}>
-                  Scan any QR below with your phone camera or click a guest card to test their personalized RSVP view:
+                  {rsvpPage?.sampleTraySubtitle ??
+                    'Scan any QR below with your phone camera or click a guest card to test their personalized RSVP view:'}
                 </span>
               </div>
             </div>
@@ -972,6 +995,17 @@ export default function RsvpTab({
             </button>
           </div>
         </form>
+      )}
+
+      {/* Render any custom Drag & Drop Blocks or Bottom Banner added to the RSVP Page */}
+      {((rsvpPage?.blocks && rsvpPage.blocks.length > 0) || rsvpPage?.showBottomBanner) && (
+        <div style={{ marginTop: '2.25rem' }}>
+          <PageBlockRenderer
+            pageData={{ ...rsvpPage, hideHeader: true }}
+            siteSettings={siteSettings}
+            onSelectTab={onSelectTab}
+          />
+        </div>
       )}
     </div>
   );

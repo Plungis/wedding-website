@@ -131,16 +131,16 @@ export default function App() {
     );
   }
 
-  const { siteSettings, aboutUs, ceremony, reception, weddingPartyPage, sampleInvites } = siteData || {};
+  const { siteSettings, aboutUs, ceremony, reception, weddingPartyPage, rsvpPage, sampleInvites } = siteData || {};
   const baseTabs = (siteSettings?.bigTabs || DEFAULT_BIG_TABS).filter((t) => t.visible !== false);
   const visibleTabs = unlockedWeddingPartyGuest || activeTab === 'wedding-party'
     ? [
         ...baseTabs,
         {
           id: 'wedding-party',
-          step: '05 • Inner Circle',
-          title: 'Wedding Party',
-          subtitle: 'Exclusive rehearsal, call times & VIP info',
+          step: weddingPartyPage?.tabStep || '05 • Inner Circle',
+          title: weddingPartyPage?.tabTitle || 'Wedding Party',
+          subtitle: weddingPartyPage?.tabSubtitle || 'Exclusive rehearsal, call times & VIP info',
           icon: 'Star',
           visible: true
         }
@@ -154,7 +154,8 @@ export default function App() {
       <div className="top-utility-bar no-print">
         <div className="top-utility-left">
           <span>
-            <strong>{siteSettings?.shortNames || 'Elena & Julian'}</strong> • Wedding Celebration
+            <strong>{siteSettings?.shortNames || 'Elena & Julian'}</strong>
+            {siteSettings?.topBarText !== '' ? ` • ${siteSettings?.topBarText || 'Wedding Celebration'}` : ''}
           </span>
           {siteSettings?.hashtag && (
             <span style={{ opacity: 0.85, display: 'inline-flex', alignItems: 'center', gap: '0.2rem', color: 'var(--accent-secondary)' }}>
@@ -176,7 +177,10 @@ export default function App() {
             }}
             onClick={() => handleSelectTab('wedding-party')}
           >
-            <Crown size={13} /> {unlockedWeddingPartyGuest ? 'Wedding Party Portal (Unlocked ✓)' : 'Wedding Party Portal'}
+            <Crown size={13} />{' '}
+            {unlockedWeddingPartyGuest
+              ? `${siteSettings?.weddingPartyBtnText || 'Wedding Party Portal'} (Unlocked ✓)`
+              : siteSettings?.weddingPartyBtnText || 'Wedding Party Portal'}
           </button>
           <button
             type="button"
@@ -287,6 +291,8 @@ export default function App() {
 
         {activeTab === 'rsvp' && (
           <RsvpTab
+            rsvpPage={rsvpPage}
+            siteSettings={siteSettings}
             initialCode={qrCodeFromUrl}
             sampleInvites={sampleInvites}
             menuOptions={reception?.menuOptions || []}
@@ -321,6 +327,11 @@ export default function App() {
         }}
       >
         <GothicRoseArchOrnament width={200} />
+        {siteSettings?.footerText && (
+          <div style={{ fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.16em', color: 'var(--accent-secondary)', marginBottom: '0.35rem' }}>
+            {siteSettings.footerText}
+          </div>
+        )}
         <div className="serif-font" style={{ fontSize: '2.1rem', marginBottom: '0.35rem' }}>
           {siteSettings?.coupleNames}
         </div>
