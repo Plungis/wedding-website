@@ -1,37 +1,47 @@
 # =============================================================================
 # Wedding Website & QR RSVP CMS - Docker Setup & Launch Script
 # Target Directory: C:\docker\wedding-website
-# GitHub Repo:      https://github.com/Plungis/wedding-website.git
+# GitHub Repo:      https://github.com/Plungis/wedding-website
 # =============================================================================
 
 $ErrorActionPreference = "Stop"
+
+# Ensure Git is in PATH if installed in standard Program Files location
+if ((Test-Path "C:\Program Files\Git\cmd") -and ($env:Path -notlike "*C:\Program Files\Git\cmd*")) {
+    $env:Path += ";C:\Program Files\Git\cmd"
+}
 
 $DockerRoot = "C:\docker"
 $AppDir     = Join-Path $DockerRoot "wedding-website"
 $DataDir    = Join-Path $AppDir "data"
 $RepoUrl    = "https://github.com/Plungis/wedding-website.git"
+$ZipUrl     = "https://github.com/Plungis/wedding-website/archive/refs/heads/main.zip"
 $Port       = 3001
 
-Write-Host "==> 1. Ensuring C:\docker directory exists..." -ForegroundColor Cyan
-if (-not (Test-Path $DockerRoot)) {
-    New-Item -ItemType Directory -Path $DockerRoot -Force | Out-Null
+Write-Host "==> 1. Ensuring C:\docker\wedding-website directory exists..." -ForegroundColor Cyan
+if (-not (Test-Path $AppDir)) {
+    New-Item -ItemType Directory -Path $AppDir -Force | Out-Null
 }
 
-Write-Host "==> 2. Setting up $AppDir from GitHub ($RepoUrl)..." -ForegroundColor Cyan
-if (-not (Test-Path $AppDir)) {
-    git clone $RepoUrl $AppDir
-} elseif (Test-Path (Join-Path $AppDir ".git")) {
-    Write-Host "    Existing repository found. Pulling latest changes..." -ForegroundColor Yellow
-    Push-Location $AppDir
-    git pull origin main
-    Pop-Location
+Write-Host "==> 2. Downloading Wedding Website from GitHub into $AppDir..." -ForegroundColor Cyan
+$TempDir = Join-Path $env:TEMP "wedding-website-setup-$(Get-Random)"
+New-Item -ItemType Directory -Path $TempDir -Force | Out-Null
+
+if (Get-Command git -ErrorAction SilentlyContinue) {
+    Write-Host "    Using Git to fetch repository..." -ForegroundColor Gray
+    $CloneTarget = Join-Path $TempDir "repo"
+    git clone $RepoUrl $CloneTarget
+    Copy-Item -Path "$CloneTarget\*" -Destination $AppDir -Recurse -Force
 } else {
-    Write-Host "    Folder exists but is not a git repo. Cloning into temp and copying..." -ForegroundColor Yellow
-    $TempClone = Join-Path $env:TEMP "wedding-website-clone-$(Get-Random)"
-    git clone $RepoUrl $TempClone
-    Copy-Item -Path "$TempClone\*" -Destination $AppDir -Recurse -Force
-    Remove-Item -Path $TempClone -Recurse -Force
+    Write-Host "    Downloading GitHub archive via HTTPS (no Git required)..." -ForegroundColor Gray
+    $ZipFile = Join-Path $TempDir "repo.zip"
+    Invoke-WebRequest -Uri $ZipUrl -OutFile $ZipFile -UseBasicParsing
+    Expand-Archive -Path $ZipFile -DestinationPath $TempDir -Force
+    $ExtractedFolder = Get-ChildItem -Path $TempDir -Directory | Select-Object -First 1
+    Copy-Item -Path "$($ExtractedFolder.FullName)\*" -Destination $AppDir -Recurse -Force
 }
+
+Remove-Item -Path $TempDir -Recurse -Force -ErrorAction SilentlyContinue
 
 Write-Host "==> 3. Ensuring persistent CMS & RSVP database folder exists at $DataDir..." -ForegroundColor Cyan
 if (-not (Test-Path $DataDir)) {
@@ -47,7 +57,7 @@ try {
 }
 
 Write-Host "==> 5. Verifying Wedding Website & CMS Server on http://localhost:$Port ..." -ForegroundColor Cyan
-$MaxAttempts = 15
+$MaxAttempts = 20
 $Ready = $false
 for ($i = 1; $i -le $MaxAttempts; $i++) {
     try {
