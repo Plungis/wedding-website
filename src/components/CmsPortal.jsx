@@ -35,7 +35,9 @@ import {
   Scissors,
   Calendar,
   UserPlus,
-  Crown
+  Crown,
+  Search,
+  MapPin
 } from 'lucide-react';
 
 const GUEST_CATEGORIES = [
@@ -771,12 +773,13 @@ export default function CmsPortal({
   const [authenticated, setAuthenticated] = useState(false);
   const [authError, setAuthError] = useState('');
 
-  // Top-level studio mode: 'builder' | 'themes' | 'guests' | 'print-qrs' | 'revisions'
+  // Top-level studio mode: 'builder' | 'all-text' | 'themes' | 'guests' | 'print-qrs' | 'revisions'
   const [studioMode, setStudioMode] = useState('builder');
+  const [globalTextFilter, setGlobalTextFilter] = useState('');
 
-  // Active page inside Visual Drag & Drop Builder: 'aboutUs' | 'ceremony' | 'reception' | 'heroTabs'
+  // Active page inside Visual Drag & Drop Builder: 'aboutUs' | 'ceremony' | 'reception' | 'rsvpPage' | 'weddingPartyPage' | 'heroTabs'
   const [builderPage, setBuilderPage] = useState('aboutUs');
-  const [selectedBlockId, setSelectedBlockId] = useState(null);
+  const [selectedBlockId, setSelectedBlockId] = useState('__HERO_BANNER__');
   const [showAddBlockDrawer, setShowAddBlockDrawer] = useState(false);
 
   const [treeDragIdx, setTreeDragIdx] = useState(null);
@@ -819,7 +822,7 @@ export default function CmsPortal({
   useEffect(() => {
     if (!cmsDb) return;
     if (['aboutUs', 'ceremony', 'reception', 'rsvpPage', 'weddingPartyPage'].includes(builderPage)) {
-      if (selectedBlockId === '__PAGE_HEADER__') return;
+      if (selectedBlockId === '__PAGE_HEADER__' || selectedBlockId === '__HERO_BANNER__') return;
       const blocks = cmsDb[builderPage]?.blocks || [];
       if (blocks.length > 0 && !blocks.some((b) => b.id === selectedBlockId)) {
         setSelectedBlockId(blocks[0].id);
@@ -869,9 +872,7 @@ export default function CmsPortal({
         setAuthenticated(true);
         setCmsDb(data.db);
         setAnalytics(data.analytics);
-        if (data.db?.aboutUs?.blocks?.[0]) {
-          setSelectedBlockId(data.db.aboutUs.blocks[0].id);
-        }
+        setSelectedBlockId('__HERO_BANNER__');
       }
     } catch {
       setAuthError('Could not connect to CMS server.');
@@ -1824,6 +1825,26 @@ export default function CmsPortal({
 
               <button
                 type="button"
+                onClick={() => setStudioMode('all-text')}
+                style={{
+                  padding: '0.45rem 0.9rem',
+                  borderRadius: '9px',
+                  border: 'none',
+                  fontWeight: 700,
+                  fontSize: '0.8rem',
+                  cursor: 'pointer',
+                  background: studioMode === 'all-text' ? 'var(--accent-primary)' : 'transparent',
+                  color: studioMode === 'all-text' ? '#fff' : 'var(--accent-secondary)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem'
+                }}
+              >
+                <Search size={15} /> Search & Edit All Site Text
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setStudioMode('themes')}
                 style={{
                   padding: '0.45rem 0.9rem',
@@ -1944,6 +1965,456 @@ export default function CmsPortal({
             </button>
           </div>
         </header>
+
+        {/* ================================================================= */}
+        {/* MODE: SEARCH & EDIT ALL SITE TEXT (MASTER TEXT EDITOR)            */}
+        {/* ================================================================= */}
+        {studioMode === 'all-text' && cmsDb && (
+          <div className="cms-scroll-body">
+            <div className="section-header-box" style={{ marginBottom: '1.5rem' }}>
+              <span className="section-kicker">Master Sitewide Copy & Text Editor</span>
+              <h2 className="section-title" style={{ fontSize: '2.3rem' }}>
+                Search & Edit Every Single Word on Your Website
+              </h2>
+              <GothicRoseArchOrnament width={210} />
+              <p className="section-subtitle">
+                Type any word you see on your website below (for example: <strong>Elena</strong>, <strong>Julian</strong>, <strong>moon</strong>, <strong>harvest</strong>, <strong>Twilight</strong>, <strong>Ravenswood</strong>) to find and edit every place it appears—then click <strong>Publish All Changes Live</strong> in the top bar!
+              </p>
+            </div>
+
+            {/* Search Filter Bar */}
+            <div
+              className="surface-card"
+              style={{
+                maxWidth: '900px',
+                margin: '0 auto 1.75rem',
+                padding: '1.15rem 1.4rem',
+                border: '2px solid var(--accent-secondary)',
+                background: 'var(--bg-accent-subtle)',
+                display: 'flex',
+                gap: '0.75rem',
+                alignItems: 'center',
+                flexWrap: 'wrap'
+              }}
+            >
+              <Search size={20} color="var(--accent-secondary)" />
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Type any word or phrase on the site to filter (e.g. Elena, Julian, moon, harvest, Twilight)..."
+                value={globalTextFilter}
+                onChange={(e) => setGlobalTextFilter(e.target.value)}
+                style={{ flex: 1, fontSize: '0.96rem', fontWeight: 600 }}
+              />
+              {globalTextFilter && (
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setGlobalTextFilter('')}
+                >
+                  Clear Filter
+                </button>
+              )}
+            </div>
+
+            <div style={{ maxWidth: '980px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              {/* 1. HOME PAGE HERO BANNER, COUPLE NAMES, MOON TAGLINE & FOOTER */}
+              {(() => {
+                const q = globalTextFilter.trim().toLowerCase();
+                const heroFields = [
+                  { key: 'coupleNames', label: 'Home Page Main Couple Names (Big Hero Heading)', multiline: false },
+                  { key: 'shortNames', label: 'Couple Short Names (Top Bar & Notes)', multiline: false },
+                  { key: 'heroEyebrow', label: 'Home Hero Top Eyebrow Badge', multiline: false },
+                  { key: 'heroTagline', label: 'Home Hero Tagline / Moon Quote Under Names', multiline: true },
+                  { key: 'weddingDateDisplay', label: 'Displayed Wedding Date Pill Text', multiline: false },
+                  { key: 'locationSummary', label: 'Displayed Location Pill Text', multiline: false },
+                  { key: 'rsvpDeadline', label: 'RSVP Deadline Text', multiline: false },
+                  { key: 'hashtag', label: 'Top Bar Wedding Hashtag', multiline: false },
+                  { key: 'topBarText', label: 'Top Utility Bar Label (Next to Short Names)', multiline: false },
+                  { key: 'weddingPartyBtnText', label: 'Top Utility Bar Wedding Party Button Text', multiline: false },
+                  { key: 'footerText', label: 'Bottom Website Footer Motto / Moon Line', multiline: false }
+                ].filter((f) => {
+                  if (!q) return true;
+                  const val = String(cmsDb.siteSettings?.[f.key] || '').toLowerCase();
+                  return val.includes(q) || f.label.toLowerCase().includes(q);
+                });
+
+                if (heroFields.length === 0) return null;
+                return (
+                  <div className="surface-card" style={{ border: '1.5px solid var(--border-gold)' }}>
+                    <h3 style={{ fontSize: '1.5rem', color: 'var(--accent-secondary)', marginBottom: '0.9rem' }}>
+                      ★ Home Page Hero Banner, Couple Names, Top Bar & Footer
+                    </h3>
+                    <div className="grid-2" style={{ gap: '0.85rem' }}>
+                      {heroFields.map((f) => (
+                        <div key={f.key} className="form-group" style={{ gridColumn: f.multiline ? '1 / -1' : 'auto', marginBottom: 0 }}>
+                          <label className="form-label">{f.label}</label>
+                          {f.multiline ? (
+                            <textarea
+                              rows={2}
+                              className="form-textarea"
+                              value={cmsDb.siteSettings?.[f.key] ?? ''}
+                              onChange={(e) => {
+                                setHasUnsavedChanges(true);
+                                setCmsDb({
+                                  ...cmsDb,
+                                  siteSettings: { ...cmsDb.siteSettings, [f.key]: e.target.value }
+                                });
+                              }}
+                            />
+                          ) : (
+                            <input
+                              type="text"
+                              className="form-input"
+                              value={cmsDb.siteSettings?.[f.key] ?? ''}
+                              onChange={(e) => {
+                                setHasUnsavedChanges(true);
+                                setCmsDb({
+                                  ...cmsDb,
+                                  siteSettings: { ...cmsDb.siteSettings, [f.key]: e.target.value }
+                                });
+                              }}
+                            />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* 2. EVERY PAGE HEADER, QUOTE, CARD & BOTTOM BANNER ACROSS ALL PAGES */}
+              {[
+                { key: 'aboutUs', title: '01 • Home / About Us Page (Quote, Couple Bios, Story Timeline, Wedding Party, Gallery & Bottom Banner)' },
+                { key: 'ceremony', title: '02 • Ceremony Page (“The Twilight Ceremony”, Venue, Order of Events, Attire & FAQ)' },
+                { key: 'reception', title: '03 • Reception Page (Venue, Dinner Menu, Evening Schedule & Hotels)' },
+                { key: 'rsvpPage', title: '04 • QR Code RSVP Page (Headings, Scanner Banner & Code Box Labels)' },
+                { key: 'weddingPartyPage', title: '05 • Wedding Party VIP Page (Rehearsal, Call Sheet & Contacts)' }
+              ].map((pg) => {
+                const pageObj = cmsDb[pg.key];
+                if (!pageObj) return null;
+                const q = globalTextFilter.trim().toLowerCase();
+                const pageString = JSON.stringify(pageObj).toLowerCase();
+                if (q && !pageString.includes(q) && !pg.title.toLowerCase().includes(q)) return null;
+
+                return (
+                  <div key={pg.key} className="surface-card" style={{ border: '1px solid var(--border-gold)' }}>
+                    <h3 style={{ fontSize: '1.45rem', color: 'var(--accent-secondary)', marginBottom: '0.85rem' }}>
+                      {pg.title}
+                    </h3>
+
+                    {/* Page Top Header & Bottom Banner Fields */}
+                    <div
+                      style={{
+                        background: 'var(--bg-primary)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '12px',
+                        padding: '0.95rem',
+                        marginBottom: '1rem'
+                      }}
+                    >
+                      <div className="form-label" style={{ color: 'var(--accent-secondary)', marginBottom: '0.55rem' }}>
+                        Page Top Title, Subtitle & Bottom Moon Banner
+                      </div>
+                      <div className="grid-2" style={{ gap: '0.65rem' }}>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label className="form-label">Page Main Title / Headline</label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            value={pageObj.headline || ''}
+                            onChange={(e) => updatePageField(pg.key, 'headline', e.target.value)}
+                          />
+                        </div>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label className="form-label">Page Top Eyebrow / Kicker</label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            value={pageObj.kicker || ''}
+                            onChange={(e) => updatePageField(pg.key, 'kicker', e.target.value)}
+                          />
+                        </div>
+                        <div className="form-group" style={{ gridColumn: '1 / -1', marginBottom: 0 }}>
+                          <label className="form-label">Page Intro Subtitle</label>
+                          <textarea
+                            rows={2}
+                            className="form-textarea"
+                            value={pageObj.subheadline || ''}
+                            onChange={(e) => updatePageField(pg.key, 'subheadline', e.target.value)}
+                          />
+                        </div>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label className="form-label">Bottom Banner Title (if enabled)</label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            value={pageObj.bottomBannerTitle ?? 'Join Us Under the October Moon'}
+                            onChange={(e) => updatePageField(pg.key, 'bottomBannerTitle', e.target.value)}
+                          />
+                        </div>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label className="form-label">Bottom Banner Subtitle</label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            value={pageObj.bottomBannerSubtitle ?? ''}
+                            onChange={(e) => updatePageField(pg.key, 'bottomBannerSubtitle', e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* All Section Blocks inside this Page */}
+                    {(pageObj.blocks || []).map((block, bIdx) => {
+                      if (q && !JSON.stringify(block).toLowerCase().includes(q)) return null;
+                      return (
+                        <div
+                          key={block.id || bIdx}
+                          style={{
+                            background: 'var(--bg-primary)',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '12px',
+                            padding: '0.95rem',
+                            marginBottom: '0.85rem'
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+                            <strong style={{ color: 'var(--accent-secondary)', fontSize: '0.9rem' }}>
+                              Section #{bIdx + 1}: {block.title || block.type}
+                            </strong>
+                            <button
+                              type="button"
+                              className="btn-secondary"
+                              style={{ padding: '0.25rem 0.65rem', fontSize: '0.74rem' }}
+                              onClick={() => {
+                                setBuilderPage(pg.key);
+                                setSelectedBlockId(block.id);
+                                setStudioMode('builder');
+                              }}
+                            >
+                              Open in Visual Canvas →
+                            </button>
+                          </div>
+
+                          {block.type === 'quote_countdown' && (
+                            <div className="grid-2" style={{ gap: '0.6rem' }}>
+                              <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label className="form-label">Note Eyebrow (e.g. A NOTE FROM ELENA & JULIAN)</label>
+                                <input
+                                  type="text"
+                                  className="form-input"
+                                  value={block.settings?.noteLabel || ''}
+                                  onChange={(e) => {
+                                    const nextBlocks = [...pageObj.blocks];
+                                    nextBlocks[bIdx] = {
+                                      ...block,
+                                      settings: { ...(block.settings || {}), noteLabel: e.target.value }
+                                    };
+                                    updateBlocksForPage(pg.key, nextBlocks);
+                                  }}
+                                />
+                              </div>
+                              <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label className="form-label">Subtext Under Quote (e.g. Join us beneath the October moon...)</label>
+                                <input
+                                  type="text"
+                                  className="form-input"
+                                  value={block.settings?.subtext || ''}
+                                  onChange={(e) => {
+                                    const nextBlocks = [...pageObj.blocks];
+                                    nextBlocks[bIdx] = {
+                                      ...block,
+                                      settings: { ...(block.settings || {}), subtext: e.target.value }
+                                    };
+                                    updateBlocksForPage(pg.key, nextBlocks);
+                                  }}
+                                />
+                              </div>
+                              <div className="form-group" style={{ gridColumn: '1 / -1', marginBottom: 0 }}>
+                                <label className="form-label">Romantic Quote</label>
+                                <input
+                                  type="text"
+                                  className="form-input"
+                                  value={block.settings?.quote || ''}
+                                  onChange={(e) => {
+                                    const nextBlocks = [...pageObj.blocks];
+                                    nextBlocks[bIdx] = {
+                                      ...block,
+                                      settings: { ...(block.settings || {}), quote: e.target.value }
+                                    };
+                                    updateBlocksForPage(pg.key, nextBlocks);
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {block.type !== 'quote_countdown' && (
+                            <div className="grid-3" style={{ gap: '0.6rem', marginBottom: block.items?.length ? '0.65rem' : 0 }}>
+                              <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label className="form-label">Section Kicker</label>
+                                <input
+                                  type="text"
+                                  className="form-input"
+                                  value={block.kicker || block.settings?.badge || ''}
+                                  onChange={(e) => {
+                                    const nextBlocks = [...pageObj.blocks];
+                                    if (block.type === 'venue_showcase') {
+                                      nextBlocks[bIdx] = {
+                                        ...block,
+                                        settings: { ...(block.settings || {}), badge: e.target.value }
+                                      };
+                                    } else {
+                                      nextBlocks[bIdx] = { ...block, kicker: e.target.value };
+                                    }
+                                    updateBlocksForPage(pg.key, nextBlocks);
+                                  }}
+                                />
+                              </div>
+                              <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label className="form-label">Section Title / Venue Name</label>
+                                <input
+                                  type="text"
+                                  className="form-input"
+                                  value={block.type === 'venue_showcase' ? block.settings?.venueName || '' : block.title || ''}
+                                  onChange={(e) => {
+                                    const nextBlocks = [...pageObj.blocks];
+                                    if (block.type === 'venue_showcase') {
+                                      nextBlocks[bIdx] = {
+                                        ...block,
+                                        settings: { ...(block.settings || {}), venueName: e.target.value }
+                                      };
+                                    } else {
+                                      nextBlocks[bIdx] = { ...block, title: e.target.value };
+                                    }
+                                    updateBlocksForPage(pg.key, nextBlocks);
+                                  }}
+                                />
+                              </div>
+                              <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label className="form-label">Section Subtitle / Address</label>
+                                <input
+                                  type="text"
+                                  className="form-input"
+                                  value={block.type === 'venue_showcase' ? block.settings?.venueAddress || '' : block.subtitle || ''}
+                                  onChange={(e) => {
+                                    const nextBlocks = [...pageObj.blocks];
+                                    if (block.type === 'venue_showcase') {
+                                      nextBlocks[bIdx] = {
+                                        ...block,
+                                        settings: { ...(block.settings || {}), venueAddress: e.target.value }
+                                      };
+                                    } else {
+                                      nextBlocks[bIdx] = { ...block, subtitle: e.target.value };
+                                    }
+                                    updateBlocksForPage(pg.key, nextBlocks);
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Render Individual Card / Item Text Inputs */}
+                          {Array.isArray(block.items) && block.items.length > 0 && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.6rem', paddingTop: '0.6rem', borderTop: '1px dashed var(--border-color)' }}>
+                              {block.items.map((item, iIdx) => {
+                                if (q && !JSON.stringify(item).toLowerCase().includes(q)) return null;
+                                const updateItemInPage = (field, val) => {
+                                  const nextBlocks = [...pageObj.blocks];
+                                  const nextItems = [...(nextBlocks[bIdx].items || [])];
+                                  nextItems[iIdx] = { ...nextItems[iIdx], [field]: val };
+                                  nextBlocks[bIdx] = { ...nextBlocks[bIdx], items: nextItems };
+                                  updateBlocksForPage(pg.key, nextBlocks);
+                                };
+                                return (
+                                  <div key={item.id || iIdx} className="grid-3" style={{ gap: '0.5rem', background: 'var(--bg-secondary)', padding: '0.65rem', borderRadius: '8px' }}>
+                                    {'name' in item && (
+                                      <div className="form-group" style={{ marginBottom: 0 }}>
+                                        <label className="form-label">Name</label>
+                                        <input type="text" className="form-input" value={item.name || ''} onChange={(e) => updateItemInPage('name', e.target.value)} />
+                                      </div>
+                                    )}
+                                    {'role' in item && (
+                                      <div className="form-group" style={{ marginBottom: 0 }}>
+                                        <label className="form-label">Role</label>
+                                        <input type="text" className="form-input" value={item.role || ''} onChange={(e) => updateItemInPage('role', e.target.value)} />
+                                      </div>
+                                    )}
+                                    {'title' in item && (
+                                      <div className="form-group" style={{ marginBottom: 0 }}>
+                                        <label className="form-label">Title</label>
+                                        <input type="text" className="form-input" value={item.title || ''} onChange={(e) => updateItemInPage('title', e.target.value)} />
+                                      </div>
+                                    )}
+                                    {'year' in item && (
+                                      <div className="form-group" style={{ marginBottom: 0 }}>
+                                        <label className="form-label">Date / Year</label>
+                                        <input type="text" className="form-input" value={item.year || ''} onChange={(e) => updateItemInPage('year', e.target.value)} />
+                                      </div>
+                                    )}
+                                    {'badge' in item && (
+                                      <div className="form-group" style={{ marginBottom: 0 }}>
+                                        <label className="form-label">Badge / Time</label>
+                                        <input type="text" className="form-input" value={item.badge || ''} onChange={(e) => updateItemInPage('badge', e.target.value)} />
+                                      </div>
+                                    )}
+                                    {'time' in item && (
+                                      <div className="form-group" style={{ marginBottom: 0 }}>
+                                        <label className="form-label">Time</label>
+                                        <input type="text" className="form-input" value={item.time || ''} onChange={(e) => updateItemInPage('time', e.target.value)} />
+                                      </div>
+                                    )}
+                                    {'question' in item && (
+                                      <div className="form-group" style={{ marginBottom: 0 }}>
+                                        <label className="form-label">Question</label>
+                                        <input type="text" className="form-input" value={item.question || ''} onChange={(e) => updateItemInPage('question', e.target.value)} />
+                                      </div>
+                                    )}
+                                    {'bio' in item && (
+                                      <div className="form-group" style={{ gridColumn: '1 / -1', marginBottom: 0 }}>
+                                        <label className="form-label">Bio</label>
+                                        <input type="text" className="form-input" value={item.bio || ''} onChange={(e) => updateItemInPage('bio', e.target.value)} />
+                                      </div>
+                                    )}
+                                    {'funFact' in item && (
+                                      <div className="form-group" style={{ gridColumn: '1 / -1', marginBottom: 0 }}>
+                                        <label className="form-label">Fun Fact</label>
+                                        <input type="text" className="form-input" value={item.funFact || ''} onChange={(e) => updateItemInPage('funFact', e.target.value)} />
+                                      </div>
+                                    )}
+                                    {'description' in item && (
+                                      <div className="form-group" style={{ gridColumn: '1 / -1', marginBottom: 0 }}>
+                                        <label className="form-label">Description</label>
+                                        <input type="text" className="form-input" value={item.description || ''} onChange={(e) => updateItemInPage('description', e.target.value)} />
+                                      </div>
+                                    )}
+                                    {'answer' in item && (
+                                      <div className="form-group" style={{ gridColumn: '1 / -1', marginBottom: 0 }}>
+                                        <label className="form-label">Answer</label>
+                                        <input type="text" className="form-input" value={item.answer || ''} onChange={(e) => updateItemInPage('answer', e.target.value)} />
+                                      </div>
+                                    )}
+                                    {'caption' in item && (
+                                      <div className="form-group" style={{ gridColumn: '1 / -1', marginBottom: 0 }}>
+                                        <label className="form-label">Photo Caption</label>
+                                        <input type="text" className="form-input" value={item.caption || ''} onChange={(e) => updateItemInPage('caption', e.target.value)} />
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* ================================================================= */}
         {/* MODE: 5 ROMANTIC GOTHIC THEMES STUDIO                             */}
@@ -2180,12 +2651,12 @@ export default function CmsPortal({
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                   {[
-                    { id: 'aboutUs', label: '01 • About Us Page', icon: Heart },
+                    { id: 'heroTabs', label: '00 • ★ Home Hero Banner, Names & Tabs', icon: Layout },
+                    { id: 'aboutUs', label: '01 • Home / About Us Page', icon: Heart },
                     { id: 'ceremony', label: '02 • Ceremony Page', icon: Sparkles },
                     { id: 'reception', label: '03 • Reception & Menu Page', icon: Wine },
                     { id: 'rsvpPage', label: '04 • QR Code RSVP Page', icon: QrCode },
-                    { id: 'weddingPartyPage', label: '05 • Wedding Party VIP Page', icon: Crown },
-                    { id: 'heroTabs', label: 'Hero Archway, Top Bar & Tabs', icon: Layout }
+                    { id: 'weddingPartyPage', label: '05 • Wedding Party VIP Page', icon: Crown }
                   ].map((pg) => {
                     const IconC = pg.icon;
                     const active = builderPage === pg.id;
@@ -2235,6 +2706,91 @@ export default function CmsPortal({
                     <Palette size={15} />
                     <span>Explore 5 Gothic Noir Themes →</span>
                   </button>
+                </div>
+              </div>
+
+              {/* ALWAYS-VISIBLE HOME HERO COUPLE NAMES & MOON TAGLINE IN LEFT SIDEBAR */}
+              <div
+                style={{
+                  background: 'var(--bg-secondary)',
+                  border: '1.5px solid var(--border-gold)',
+                  borderRadius: '12px',
+                  padding: '0.85rem'
+                }}
+              >
+                <div
+                  className="form-label"
+                  style={{
+                    marginBottom: '0.45rem',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    color: 'var(--accent-secondary)'
+                  }}
+                >
+                  <span>★ Home Hero Names & Moon Tagline</span>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    style={{ padding: '0.18rem 0.45rem', fontSize: '0.68rem' }}
+                    onClick={() => setSelectedBlockId('__HERO_BANNER__')}
+                  >
+                    Full Hero
+                  </button>
+                </div>
+                <div style={{ marginBottom: '0.45rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '0.18rem' }}>
+                    Couple Full Names (Hero Heading)
+                  </label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={cmsDb.siteSettings?.coupleNames || ''}
+                    onChange={(e) => {
+                      setHasUnsavedChanges(true);
+                      setCmsDb({
+                        ...cmsDb,
+                        siteSettings: { ...cmsDb.siteSettings, coupleNames: e.target.value }
+                      });
+                    }}
+                    style={{ padding: '0.45rem 0.65rem', fontSize: '0.82rem', fontWeight: 700 }}
+                  />
+                </div>
+                <div style={{ marginBottom: '0.45rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '0.18rem' }}>
+                    Top Hero Eyebrow Badge
+                  </label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={cmsDb.siteSettings?.heroEyebrow || ''}
+                    onChange={(e) => {
+                      setHasUnsavedChanges(true);
+                      setCmsDb({
+                        ...cmsDb,
+                        siteSettings: { ...cmsDb.siteSettings, heroEyebrow: e.target.value }
+                      });
+                    }}
+                    style={{ padding: '0.45rem 0.65rem', fontSize: '0.78rem' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '0.18rem' }}>
+                    Hero Tagline / Moon Quote Under Names
+                  </label>
+                  <textarea
+                    rows={2}
+                    className="form-textarea"
+                    value={cmsDb.siteSettings?.heroTagline || ''}
+                    onChange={(e) => {
+                      setHasUnsavedChanges(true);
+                      setCmsDb({
+                        ...cmsDb,
+                        siteSettings: { ...cmsDb.siteSettings, heroTagline: e.target.value }
+                      });
+                    }}
+                    style={{ padding: '0.45rem 0.65rem', fontSize: '0.78rem' }}
+                  />
                 </div>
               </div>
 
@@ -2463,6 +3019,34 @@ export default function CmsPortal({
                     )}
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                      {/* 00. HOME HERO BANNER & COUPLE NAMES ITEM */}
+                      <div
+                        onClick={() => setSelectedBlockId('__HERO_BANNER__')}
+                        style={{
+                          padding: '0.65rem 0.75rem',
+                          borderRadius: '10px',
+                          background: selectedBlockId === '__HERO_BANNER__' ? 'var(--bg-accent-subtle)' : 'var(--bg-secondary)',
+                          border:
+                            selectedBlockId === '__HERO_BANNER__'
+                              ? '1.5px solid var(--accent-secondary)'
+                              : '1px solid var(--border-gold)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          gap: '0.5rem'
+                        }}
+                      >
+                        <div style={{ overflow: 'hidden' }}>
+                          <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--accent-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            ★ Home Hero: “{cmsDb.siteSettings?.coupleNames || 'Couple Names'}”
+                          </div>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                            HERO ARCHWAY, MOON TAGLINE, PHOTO, TOP BAR & TABS
+                          </div>
+                        </div>
+                      </div>
+
                       {/* 0. PAGE TITLE & TOP HEADER ITEM */}
                       <div
                         onClick={() => setSelectedBlockId('__PAGE_HEADER__')}
@@ -2605,7 +3189,121 @@ export default function CmsPortal({
                 )}
               </div>
 
-              {isBlockPage && currentPageObj ? (
+              {/* ALWAYS RENDER INTERACTIVE HOME HERO BANNER & BIG TABS AT TOP OF VISUAL CANVAS */}
+              <div
+                onClick={() => setSelectedBlockId('__HERO_BANNER__')}
+                style={{
+                  position: 'relative',
+                  marginBottom: '1.5rem',
+                  borderRadius: '20px',
+                  border:
+                    selectedBlockId === '__HERO_BANNER__' || builderPage === 'heroTabs'
+                      ? '2.5px solid var(--accent-secondary)'
+                      : '1.5px dashed rgba(212, 168, 83, 0.5)',
+                  padding: '0.75rem',
+                  background:
+                    selectedBlockId === '__HERO_BANNER__' || builderPage === 'heroTabs'
+                      ? 'rgba(158, 27, 50, 0.12)'
+                      : 'transparent',
+                  cursor: 'pointer'
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    background: '#080508',
+                    border: '1px solid var(--border-gold)',
+                    borderRadius: '10px',
+                    padding: '0.42rem 0.75rem',
+                    marginBottom: '0.75rem',
+                    fontSize: '0.76rem'
+                  }}
+                >
+                  <span style={{ fontWeight: 700, color: 'var(--accent-secondary)' }}>
+                    ★ HOME PAGE HERO BANNER (“{cmsDb.siteSettings?.coupleNames}”) & MOON TAGLINE
+                  </span>
+                  <span
+                    style={{
+                      background: 'var(--accent-secondary)',
+                      color: '#090608',
+                      padding: '0.22rem 0.55rem',
+                      borderRadius: '6px',
+                      fontWeight: 700,
+                      fontSize: '0.72rem'
+                    }}
+                  >
+                    Click to Edit Names, Moon Quote, Photo & Tabs →
+                  </span>
+                </div>
+
+                <header
+                  className="wedding-hero"
+                  style={{
+                    borderRadius: '18px',
+                    marginBottom: '1rem',
+                    padding: '2rem 1.25rem 2.35rem',
+                    backgroundImage: `url(${cmsDb.siteSettings?.heroBannerUrl})`,
+                    backgroundPosition: `${cmsDb.siteSettings?.heroBannerCrop?.x ?? 50}% ${cmsDb.siteSettings?.heroBannerCrop?.y ?? 50}%`
+                  }}
+                >
+                  <div className="hero-gothic-arch-frame">
+                    <span className="hero-eyebrow">{cmsDb.siteSettings?.heroEyebrow}</span>
+                    <h1 className="hero-couple-names" style={{ fontSize: '2.35rem' }}>
+                      {cmsDb.siteSettings?.coupleNames}
+                    </h1>
+                    <GothicRoseArchOrnament width={180} />
+                    <p className="hero-tagline">{cmsDb.siteSettings?.heroTagline}</p>
+                    <div className="hero-meta-pills">
+                      <span className="hero-pill">
+                        <Calendar size={14} color="var(--accent-secondary)" /> {cmsDb.siteSettings?.weddingDateDisplay}
+                      </span>
+                      <span className="hero-pill">
+                        <MapPin size={14} color="var(--accent-secondary)" /> {cmsDb.siteSettings?.locationSummary}
+                      </span>
+                    </div>
+                  </div>
+                </header>
+
+                <div className="big-tabs-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.55rem' }}>
+                  {(cmsDb.siteSettings?.bigTabs || []).map((tab) => {
+                    const tabPageMap = {
+                      about: 'aboutUs',
+                      ceremony: 'ceremony',
+                      reception: 'reception',
+                      rsvp: 'rsvpPage'
+                    };
+                    const targetPg = tabPageMap[tab.id] || 'aboutUs';
+                    const isActiveTab = builderPage === targetPg;
+                    return (
+                      <div
+                        key={tab.id}
+                        className={`big-tab-card ${isActiveTab ? 'active' : ''}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setBuilderPage(targetPg);
+                        }}
+                        style={{
+                          padding: '0.75rem',
+                          opacity: tab.visible === false ? 0.45 : 1,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <div className="big-tab-top">
+                          <span className="big-tab-step" style={{ fontSize: '0.65rem' }}>{tab.step}</span>
+                        </div>
+                        <div>
+                          <div className="big-tab-title" style={{ fontSize: '1.05rem' }}>{tab.title}</div>
+                          <div className="big-tab-subtitle" style={{ fontSize: '0.72rem' }}>{tab.subtitle}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {isBlockPage && currentPageObj && (
                 <PageBlockRenderer
                   pageData={currentPageObj}
                   siteSettings={cmsDb.siteSettings}
@@ -2618,42 +3316,6 @@ export default function CmsPortal({
                   onDeleteBlock={(id) => handleDeleteBlock(builderPage, id)}
                   onDragReorderBlocks={(fromIdx, toIdx) => handleDragReorderBlocks(builderPage, fromIdx, toIdx)}
                 />
-              ) : (
-                <div>
-                  <header
-                    className="wedding-hero"
-                    style={{
-                      borderRadius: '20px',
-                      marginBottom: '1.5rem',
-                      padding: '2.5rem 1.5rem 3rem',
-                      backgroundImage: `url(${cmsDb.siteSettings?.heroBannerUrl})`,
-                      backgroundPosition: `${cmsDb.siteSettings?.heroBannerCrop?.x ?? 50}% ${cmsDb.siteSettings?.heroBannerCrop?.y ?? 50}%`
-                    }}
-                  >
-                    <div className="hero-gothic-arch-frame">
-                      <span className="hero-eyebrow">{cmsDb.siteSettings?.heroEyebrow}</span>
-                      <h1 className="hero-couple-names" style={{ fontSize: '2.6rem' }}>
-                        {cmsDb.siteSettings?.coupleNames}
-                      </h1>
-                      <GothicRoseArchOrnament width={200} />
-                      <p className="hero-tagline">{cmsDb.siteSettings?.heroTagline}</p>
-                    </div>
-                  </header>
-
-                  <div className="big-tabs-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
-                    {(cmsDb.siteSettings?.bigTabs || []).map((tab) => (
-                      <div key={tab.id} className="big-tab-card" style={{ opacity: tab.visible === false ? 0.4 : 1 }}>
-                        <div className="big-tab-top">
-                          <span className="big-tab-step">{tab.step}</span>
-                        </div>
-                        <div>
-                          <div className="big-tab-title">{tab.title}</div>
-                          <div className="big-tab-subtitle">{tab.subtitle}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
               )}
             </div>
 
@@ -2666,13 +3328,19 @@ export default function CmsPortal({
                 overflowY: 'auto'
               }}
             >
-              {builderPage === 'heroTabs' && (
-                <div>
+              {(builderPage === 'heroTabs' || selectedBlockId === '__HERO_BANNER__') && (
+                <div
+                  style={{
+                    marginBottom: '1.35rem',
+                    paddingBottom: '1.25rem',
+                    borderBottom: '2px solid var(--border-gold)'
+                  }}
+                >
                   <h4 style={{ fontSize: '1.45rem', marginBottom: '0.35rem', color: 'var(--accent-secondary)' }}>
-                    Hero Archway & Big Tabs Inspector
+                    ★ Home Page Hero Banner, Couple Names & Big Tabs
                   </h4>
                   <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1.15rem' }}>
-                    Edit the Gothic archway header, line up the hero photo, and drag-and-drop the Big Tabs.
+                    Edit the couple names (“Elena Vance & Julian Sterling”), the moon/harvest tagline, hero photo, top bar, footer, and Big Tabs.
                   </p>
 
                   <div className="form-group">

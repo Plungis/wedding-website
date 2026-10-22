@@ -1129,37 +1129,72 @@ export default function PageBlockRenderer({
             flexWrap: 'wrap',
             gap: '1rem',
             background: 'var(--bg-accent-subtle)',
-            border: '1px solid var(--border-gold)',
+            border:
+              editMode && selectedBlockId === '__PAGE_HEADER__'
+                ? '2.5px solid var(--accent-secondary)'
+                : '1px solid var(--border-gold)',
             opacity: pageData.showBottomBanner ? 1 : 0.45,
-            cursor: editMode ? 'pointer' : 'default'
+            cursor: editMode ? 'pointer' : 'default',
+            position: 'relative'
           }}
         >
+          {editMode && (
+            <div
+              style={{
+                width: '100%',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                paddingBottom: '0.5rem',
+                marginBottom: '0.5rem',
+                borderBottom: '1px dashed var(--border-gold)',
+                fontSize: '0.74rem',
+                fontWeight: 700,
+                color: 'var(--accent-secondary)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em'
+              }}
+            >
+              <span>★ BOTTOM PAGE BANNER {pageData.showBottomBanner ? '(Visible)' : '(Hidden — Click to Enable)'}</span>
+              <span>Click to Edit Banner Text & Buttons →</span>
+            </div>
+          )}
           <div>
             <h4 style={{ fontSize: '1.6rem', marginBottom: '0.2rem' }}>
-              {pageData.bottomBannerTitle || 'Ready to explore the wedding night details?'}
+              {pageData.bottomBannerTitle || 'Join Us Under the October Moon'}
             </h4>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.94rem' }}>
               {pageData.bottomBannerSubtitle ||
-                'View the ceremony schedule, reception menu, or scan your invitation QR code to RSVP.'}
+                'Explore our candlelit ceremony details, autumn feast menu, or scan your invitation QR code to RSVP.'}
             </p>
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-            {(pageData.bottomPrimaryBtnText || 'Explore Ceremony') && (
+            {(pageData.bottomBannerPrimaryText || pageData.bottomPrimaryBtnText || 'View Twilight Ceremony') && (
               <button
                 type="button"
                 className="btn-secondary"
-                onClick={() => onSelectTab && onSelectTab(pageData.bottomPrimaryBtnTab || 'ceremony')}
+                onClick={() =>
+                  !editMode &&
+                  onSelectTab &&
+                  onSelectTab(pageData.bottomBannerPrimaryTab || pageData.bottomPrimaryBtnTab || 'ceremony')
+                }
               >
-                {pageData.bottomPrimaryBtnText || 'Explore Ceremony'} <ArrowRight size={16} />
+                {pageData.bottomBannerPrimaryText || pageData.bottomPrimaryBtnText || 'View Twilight Ceremony'}{' '}
+                <ArrowRight size={16} />
               </button>
             )}
-            {(pageData.bottomSecondaryBtnText || 'Go to QR RSVP') && (
+            {(pageData.bottomBannerSecondaryText || pageData.bottomSecondaryBtnText || 'Open QR Code RSVP') && (
               <button
                 type="button"
                 className="btn-primary"
-                onClick={() => onSelectTab && onSelectTab(pageData.bottomSecondaryBtnTab || 'rsvp')}
+                onClick={() =>
+                  !editMode &&
+                  onSelectTab &&
+                  onSelectTab(pageData.bottomBannerSecondaryTab || pageData.bottomSecondaryBtnTab || 'rsvp')
+                }
               >
-                {pageData.bottomSecondaryBtnText || 'Go to QR RSVP'} <ArrowRight size={16} />
+                {pageData.bottomBannerSecondaryText || pageData.bottomSecondaryBtnText || 'Open QR Code RSVP'}{' '}
+                <ArrowRight size={16} />
               </button>
             )}
           </div>
