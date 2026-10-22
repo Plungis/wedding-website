@@ -147,6 +147,29 @@ function loadDatabase() {
     if (Array.isArray(merged.guests)) {
       merged.guests = merged.guests.map((g) => normalizeGuestPlusOnes(g));
     }
+    if (!Array.isArray(merged.cmsUsers) || merged.cmsUsers.length === 0) {
+      merged.cmsUsers = [
+        {
+          id: 'user-admin-default',
+          username: 'admin',
+          passcode: merged.siteSettings?.adminPasscode || 'wedding2026',
+          displayName: 'Primary Administrator',
+          role: 'admin',
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: 'user-editor-default',
+          username: 'editor',
+          passcode: 'edit2026',
+          displayName: 'Wedding Editor',
+          role: 'editor',
+          createdAt: new Date().toISOString()
+        }
+      ];
+    }
+    if (!Array.isArray(merged.pendingProposals)) {
+      merged.pendingProposals = [];
+    }
     syncReceptionMenuOptions(merged);
     return merged;
   } catch (err) {
@@ -232,14 +255,65 @@ function computeAnalytics(guests = [], menuOptions = []) {
   };
 }
 
-function requireAdmin(req, res, next) {
+function authenticateUser(req) {
   const db = loadDatabase();
-  const provided = req.headers['x-admin-passcode'] || req.query.passcode || req.body?.passcode;
-  const expected = db.siteSettings?.adminPasscode || 'wedding2026';
-  if (provided !== expected) {
-    return res.status(401).json({ error: 'Invalid admin passcode. Default passcode is wedding2026.' });
+  const rawPasscode = req.headers['x-admin-passcode'] || req.headers['authorization'] || req.query.passcode || req.body?.passcode;
+  const rawUsername = (req.headers['x-cms-username'] || req.query.username || req.body?.username || '').trim();
+
+  if (!rawPasscode) return null;
+
+  const users = Array.isArray(db.cmsUsers) ? db.cmsUsers : [];
+
+  // 1. Match by username & passcode
+  if (rawUsername) {
+    const match = users.find(
+      (u) => u.username.toLowerCase() === rawUsername.toLowerCase() && u.passcode === rawPasscode
+    );
+    if (match) return { user: match, db };
   }
-  req.db = db;
+
+  // 2. Match by passcode alone across existing CMS users
+  const matchByPasscode = users.find((u) => u.passcode === rawPasscode);
+  if (matchByPasscode) {
+    return { user: matchByPasscode, db };
+  }
+
+  // 3. Fallback for legacy adminPasscode configuration
+  if (rawPasscode === (db.siteSettings?.adminPasscode || 'wedding2026')) {
+    const adminUser = users.find((u) => u.role === 'admin') || {
+      id: 'legacy-admin',
+      username: 'admin',
+      displayName: 'Administrator',
+      role: 'admin'
+    };
+    return { user: adminUser, db };
+  }
+
+  return null;
+}
+
+function requireCmsAuth(req, res, next) {
+  const auth = authenticateUser(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized. Please sign in with a valid CMS account or passcode.' });
+  }
+  req.cmsUser = auth.user;
+  req.db = auth.db;
+  next();
+}
+
+function requireAdmin(req, res, next) {
+  const auth = authenticateUser(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized. Please sign in with an Admin account.' });
+  }
+  if (auth.user.role !== 'admin') {
+    return res.status(403).json({
+      error: 'Admin access required. Your account role is Editor (changes must go through Admin approval).'
+    });
+  }
+  req.cmsUser = auth.user;
+  req.db = auth.db;
   next();
 }
 
@@ -393,39 +467,95 @@ app.get('/api/qr/:code', async (req, res) => {
   }
 });
 
-// 5. Admin Authentication & Full CMS Data Load
+// 5. Multi-Role CMS Authentication & Data Load
 app.post('/api/admin/login', (req, res) => {
   const db = loadDatabase();
-  const { passcode } = req.body || {};
-  const expected = db.siteSettings?.adminPasscode || 'wedding2026';
+  const rawPasscode = (req.body?.passcode || '').trim();
+  const rawUsername = (req.body?.username || '').trim();
 
-  if (passcode !== expected) {
-    return res.status(401).json({ error: 'Incorrect passcode. Try "wedding2026".' });
+  const users = Array.isArray(db.cmsUsers) ? db.cmsUsers : [];
+
+  let matchedUser = null;
+  if (rawUsername) {
+    matchedUser = users.find(
+      (u) => u.username.toLowerCase() === rawUsername.toLowerCase() && u.passcode === rawPasscode
+    );
+  } else {
+    matchedUser = users.find((u) => u.passcode === rawPasscode);
+  }
+
+  if (!matchedUser && rawPasscode === (db.siteSettings?.adminPasscode || 'wedding2026')) {
+    matchedUser = users.find((u) => u.role === 'admin') || {
+      id: 'legacy-admin',
+      username: 'admin',
+      displayName: 'Administrator',
+      role: 'admin'
+    };
+  }
+
+  if (!matchedUser) {
+    return res.status(401).json({
+      error: 'Invalid credentials. Please enter a valid CMS username and passcode.'
+    });
   }
 
   res.json({
     authenticated: true,
+    user: {
+      id: matchedUser.id,
+      username: matchedUser.username,
+      displayName: matchedUser.displayName,
+      role: matchedUser.role
+    },
     db,
     analytics: computeAnalytics(db.guests, db.reception?.menuOptions)
   });
 });
 
-app.get('/api/admin/data', requireAdmin, (req, res) => {
+app.get('/api/admin/data', requireCmsAuth, (req, res) => {
   const db = req.db;
   res.json({
     db,
-    analytics: computeAnalytics(db.guests, db.reception?.menuOptions)
+    analytics: computeAnalytics(db.guests, db.reception?.menuOptions),
+    user: req.cmsUser
   });
 });
 
-// 6. Update CMS Section (siteSettings, aboutUs, ceremony, reception, weddingPartyPage, rsvpPage)
-app.put('/api/admin/section/:sectionName', requireAdmin, (req, res) => {
+// 6. Update CMS Section
+app.put('/api/admin/section/:sectionName', requireCmsAuth, (req, res) => {
   const db = req.db;
   const { sectionName } = req.params;
   const allowedSections = ['siteSettings', 'aboutUs', 'ceremony', 'reception', 'weddingPartyPage', 'rsvpPage'];
 
   if (!allowedSections.includes(sectionName)) {
     return res.status(400).json({ error: `Invalid section: ${sectionName}` });
+  }
+
+  if (req.cmsUser.role === 'editor') {
+    const proposal = {
+      id: `prop-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      submittedBy: {
+        id: req.cmsUser.id,
+        username: req.cmsUser.username,
+        displayName: req.cmsUser.displayName,
+        role: req.cmsUser.role
+      },
+      summary: `Updated ${sectionName} layout & content`,
+      status: 'pending',
+      proposedData: {
+        [sectionName]: req.body.data
+      }
+    };
+    db.pendingProposals = [proposal, ...(db.pendingProposals || [])];
+    saveDatabase(db, `Draft section update proposal submitted by Editor ${req.cmsUser.displayName}`, 'editor-proposal');
+    return res.json({
+      message: `Proposal submitted for ${sectionName}. Pending Admin approval.`,
+      pendingApproval: true,
+      proposal,
+      db,
+      analytics: computeAnalytics(db.guests, db.reception?.menuOptions)
+    });
   }
 
   db[sectionName] = req.body.data;
@@ -439,11 +569,45 @@ app.put('/api/admin/section/:sectionName', requireAdmin, (req, res) => {
   });
 });
 
-// 6b. Publish Full CMS State (All Pages + Site Settings at once)
-app.put('/api/admin/publish-all', requireAdmin, (req, res) => {
+// 6b. Publish Full CMS State (Admin: Live Auto-Approval | Editor: Pending Proposal Queue)
+app.put('/api/admin/publish-all', requireCmsAuth, (req, res) => {
   const db = req.db;
-  const { siteSettings, aboutUs, ceremony, reception, weddingPartyPage, rsvpPage } = req.body || {};
+  const { siteSettings, aboutUs, ceremony, reception, weddingPartyPage, rsvpPage, changeSummary } = req.body || {};
 
+  if (req.cmsUser.role === 'editor') {
+    const proposal = {
+      id: `prop-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      submittedBy: {
+        id: req.cmsUser.id,
+        username: req.cmsUser.username,
+        displayName: req.cmsUser.displayName,
+        role: req.cmsUser.role
+      },
+      summary: changeSummary || 'Editor website layout and content proposal',
+      status: 'pending',
+      proposedData: {
+        siteSettings: siteSettings || db.siteSettings,
+        aboutUs: aboutUs || db.aboutUs,
+        ceremony: ceremony || db.ceremony,
+        reception: reception || db.reception,
+        weddingPartyPage: weddingPartyPage || db.weddingPartyPage,
+        rsvpPage: rsvpPage || db.rsvpPage
+      }
+    };
+    db.pendingProposals = [proposal, ...(db.pendingProposals || [])];
+    saveDatabase(db, `Pending change proposal submitted by Editor ${req.cmsUser.displayName}`, 'editor-proposal');
+
+    return res.json({
+      message: 'Your changes have been submitted to the Admin Approval Queue! Once an administrator approves them, they will be published live.',
+      pendingApproval: true,
+      proposal,
+      db,
+      analytics: computeAnalytics(db.guests, db.reception?.menuOptions)
+    });
+  }
+
+  // Admin role: Automatic live approval
   if (siteSettings) db.siteSettings = siteSettings;
   if (aboutUs) db.aboutUs = aboutUs;
   if (ceremony) db.ceremony = ceremony;
@@ -452,17 +616,220 @@ app.put('/api/admin/publish-all', requireAdmin, (req, res) => {
   if (rsvpPage) db.rsvpPage = rsvpPage;
 
   syncReceptionMenuOptions(db);
-  saveDatabase(db, 'Published visual drag-and-drop changes across website sections', 'visual-builder');
+  saveDatabase(db, `Published live by Admin ${req.cmsUser.displayName}`, 'visual-builder');
 
   res.json({
-    message: 'All website sections published live!',
+    message: 'All website sections published live! (Admin Auto-Approved)',
+    autoApproved: true,
     db,
     analytics: computeAnalytics(db.guests, db.reception?.menuOptions)
   });
 });
 
+// 6c. Approve Pending Proposal (Admin Only)
+app.post('/api/admin/proposals/:id/approve', requireAdmin, (req, res) => {
+  const db = req.db;
+  const { id } = req.params;
+  const proposalIndex = (db.pendingProposals || []).findIndex((p) => p.id === id);
+
+  if (proposalIndex === -1) {
+    return res.status(404).json({ error: 'Proposal not found.' });
+  }
+
+  const proposal = db.pendingProposals[proposalIndex];
+  const pData = proposal.proposedData || {};
+
+  if (pData.siteSettings) db.siteSettings = pData.siteSettings;
+  if (pData.aboutUs) db.aboutUs = pData.aboutUs;
+  if (pData.ceremony) db.ceremony = pData.ceremony;
+  if (pData.reception) db.reception = pData.reception;
+  if (pData.weddingPartyPage) db.weddingPartyPage = pData.weddingPartyPage;
+  if (pData.rsvpPage) db.rsvpPage = pData.rsvpPage;
+
+  proposal.status = 'approved';
+  proposal.reviewedAt = new Date().toISOString();
+  proposal.reviewedBy = {
+    id: req.cmsUser.id,
+    username: req.cmsUser.username,
+    displayName: req.cmsUser.displayName
+  };
+
+  syncReceptionMenuOptions(db);
+  saveDatabase(
+    db,
+    `Approved & published change proposal from ${proposal.submittedBy?.displayName || 'Editor'} (${proposal.summary})`,
+    'proposal-approved'
+  );
+
+  res.json({
+    message: `Proposal approved and published live!`,
+    db,
+    analytics: computeAnalytics(db.guests, db.reception?.menuOptions)
+  });
+});
+
+// 6d. Reject Pending Proposal (Admin Only)
+app.post('/api/admin/proposals/:id/reject', requireAdmin, (req, res) => {
+  const db = req.db;
+  const { id } = req.params;
+  const { reviewNote } = req.body || {};
+  const proposalIndex = (db.pendingProposals || []).findIndex((p) => p.id === id);
+
+  if (proposalIndex === -1) {
+    return res.status(404).json({ error: 'Proposal not found.' });
+  }
+
+  const proposal = db.pendingProposals[proposalIndex];
+  proposal.status = 'rejected';
+  proposal.reviewNote = reviewNote || '';
+  proposal.reviewedAt = new Date().toISOString();
+  proposal.reviewedBy = {
+    id: req.cmsUser.id,
+    username: req.cmsUser.username,
+    displayName: req.cmsUser.displayName
+  };
+
+  saveDatabase(
+    db,
+    `Rejected proposal from ${proposal.submittedBy?.displayName || 'Editor'}: ${proposal.summary}`,
+    'proposal-rejected'
+  );
+
+  res.json({
+    message: 'Proposal has been rejected.',
+    db,
+    analytics: computeAnalytics(db.guests, db.reception?.menuOptions)
+  });
+});
+
+// 6e. Delete / Clear Proposal Record (Admin Only)
+app.delete('/api/admin/proposals/:id', requireAdmin, (req, res) => {
+  const db = req.db;
+  const { id } = req.params;
+  db.pendingProposals = (db.pendingProposals || []).filter((p) => p.id !== id);
+  saveDatabase(db, `Removed proposal record (${id})`, 'proposal-deleted');
+  res.json({
+    message: 'Proposal deleted.',
+    db,
+    analytics: computeAnalytics(db.guests, db.reception?.menuOptions)
+  });
+});
+
+// 6f. User Management Endpoints (Admin Only)
+app.get('/api/admin/users', requireAdmin, (req, res) => {
+  const db = req.db;
+  res.json({ users: db.cmsUsers || [] });
+});
+
+app.post('/api/admin/users', requireAdmin, (req, res) => {
+  const db = req.db;
+  const { username, passcode, displayName, role } = req.body || {};
+
+  const cleanUser = (username || '').trim().toLowerCase();
+  const cleanPass = (passcode || '').trim();
+  const cleanName = (displayName || '').trim();
+  const cleanRole = role === 'editor' ? 'editor' : 'admin';
+
+  if (!cleanUser || !cleanPass) {
+    return res.status(400).json({ error: 'Username and passcode are required.' });
+  }
+
+  if ((db.cmsUsers || []).some((u) => u.username.toLowerCase() === cleanUser)) {
+    return res.status(400).json({ error: `Username "${cleanUser}" is already taken.` });
+  }
+
+  const newUser = {
+    id: `user-${Date.now()}`,
+    username: cleanUser,
+    passcode: cleanPass,
+    displayName: cleanName || cleanUser,
+    role: cleanRole,
+    createdAt: new Date().toISOString()
+  };
+
+  db.cmsUsers = [...(db.cmsUsers || []), newUser];
+  saveDatabase(db, `Created new CMS user account "${cleanUser}" with role "${cleanRole}"`, 'user-management');
+
+  res.status(201).json({
+    message: `User account "${cleanUser}" created successfully.`,
+    user: newUser,
+    db
+  });
+});
+
+app.put('/api/admin/users/:id', requireAdmin, (req, res) => {
+  const db = req.db;
+  const { id } = req.params;
+  const { username, passcode, displayName, role } = req.body || {};
+
+  const userIndex = (db.cmsUsers || []).findIndex((u) => u.id === id);
+  if (userIndex === -1) {
+    return res.status(404).json({ error: 'User not found.' });
+  }
+
+  const existing = db.cmsUsers[userIndex];
+  const cleanUser = username ? username.trim().toLowerCase() : existing.username;
+  const cleanPass = passcode ? passcode.trim() : existing.passcode;
+  const cleanName = displayName ? displayName.trim() : existing.displayName;
+  const cleanRole = role ? (role === 'editor' ? 'editor' : 'admin') : existing.role;
+
+  if (cleanUser !== existing.username && db.cmsUsers.some((u, i) => i !== userIndex && u.username.toLowerCase() === cleanUser)) {
+    return res.status(400).json({ error: `Username "${cleanUser}" is already taken.` });
+  }
+
+  // Prevent demoting the last admin to editor
+  if (existing.role === 'admin' && cleanRole === 'editor') {
+    const adminCount = db.cmsUsers.filter((u) => u.role === 'admin').length;
+    if (adminCount <= 1) {
+      return res.status(400).json({ error: 'Cannot change role: At least one Administrator account must remain active.' });
+    }
+  }
+
+  db.cmsUsers[userIndex] = {
+    ...existing,
+    username: cleanUser,
+    passcode: cleanPass,
+    displayName: cleanName,
+    role: cleanRole,
+    updatedAt: new Date().toISOString()
+  };
+
+  saveDatabase(db, `Updated CMS user account "${cleanUser}"`, 'user-management');
+
+  res.json({
+    message: `User account "${cleanUser}" updated successfully.`,
+    user: db.cmsUsers[userIndex],
+    db
+  });
+});
+
+app.delete('/api/admin/users/:id', requireAdmin, (req, res) => {
+  const db = req.db;
+  const { id } = req.params;
+  const target = (db.cmsUsers || []).find((u) => u.id === id);
+
+  if (!target) {
+    return res.status(404).json({ error: 'User not found.' });
+  }
+
+  if (target.role === 'admin') {
+    const adminCount = db.cmsUsers.filter((u) => u.role === 'admin').length;
+    if (adminCount <= 1) {
+      return res.status(400).json({ error: 'Cannot delete the only Administrator account.' });
+    }
+  }
+
+  db.cmsUsers = (db.cmsUsers || []).filter((u) => u.id !== id);
+  saveDatabase(db, `Deleted CMS user account "${target.username}"`, 'user-management');
+
+  res.json({
+    message: `User account "${target.username}" deleted.`,
+    db
+  });
+});
+
 // 7. Create a new Guest Household & Unique QR Code
-app.post('/api/admin/guests', requireAdmin, (req, res) => {
+app.post('/api/admin/guests', requireCmsAuth, (req, res) => {
   const db = req.db;
   const payload = req.body || {};
 
@@ -525,7 +892,7 @@ app.post('/api/admin/guests', requireAdmin, (req, res) => {
 });
 
 // 8. Update Guest Household or regenerate QR code
-app.put('/api/admin/guests/:id', requireAdmin, (req, res) => {
+app.put('/api/admin/guests/:id', requireCmsAuth, (req, res) => {
   const db = req.db;
   const { id } = req.params;
   const idx = db.guests.findIndex((g) => g.id === id);
@@ -558,7 +925,7 @@ app.put('/api/admin/guests/:id', requireAdmin, (req, res) => {
 });
 
 // 9. Delete Guest Household
-app.delete('/api/admin/guests/:id', requireAdmin, (req, res) => {
+app.delete('/api/admin/guests/:id', requireCmsAuth, (req, res) => {
   const db = req.db;
   const { id } = req.params;
   const target = db.guests.find((g) => g.id === id);

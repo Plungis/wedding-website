@@ -889,5 +889,24 @@ export const defaultDatabase = {
       section: "system",
       summary: "Initialized Drag-and-Drop Visual Block CMS & Fall Goth Wedding Theme"
     }
-  ]
+  ],
+  cmsUsers: [
+    {
+      id: "user-admin-default",
+      username: "admin",
+      passcode: "wedding2026",
+      displayName: "Administrator",
+      role: "admin",
+      createdAt: "2026-10-22T00:00:00.000Z"
+    },
+    {
+      id: "user-editor-sample",
+      username: "editor",
+      passcode: "edit2026",
+      displayName: "Wedding Planner",
+      role: "editor",
+      createdAt: "2026-10-22T00:00:00.000Z"
+    }
+  ],
+  pendingProposals: []
 };

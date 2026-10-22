@@ -120,7 +120,9 @@ Write-Host ""
 Write-Host "==================================================================" -ForegroundColor Magenta
 Write-Host "  Wedding Website & Visual CMS is LIVE!" -ForegroundColor Green
 Write-Host "  Permanent Data Folder: C:\docker\wedding-data\db.json" -ForegroundColor Green
-Write-Host "  URL:                   http://localhost:$Port" -ForegroundColor White
-Write-Host "  CMS Passcode:          wedding2026" -ForegroundColor Yellow
+Write-Host "  Public Website:        http://localhost:$Port" -ForegroundColor White
+Write-Host "  Private CMS Desk:      http://localhost:$Port/cmsdesk" -ForegroundColor Yellow
+Write-Host "  Admin Login:           admin / wedding2026 (Auto-Approval)" -ForegroundColor Cyan
+Write-Host "  Editor Login:          editor / edit2026 (Approval Required)" -ForegroundColor Gray
 Write-Host "==================================================================" -ForegroundColor Magenta
-Start-Process "http://localhost:$Port"
+Start-Process "http://localhost:$Port/cmsdesk"

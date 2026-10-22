@@ -43,7 +43,16 @@ import {
   UserPlus,
   Crown,
   Search,
-  MapPin
+  MapPin,
+  ShieldCheck,
+  Users,
+  CheckCircle2,
+  XCircle,
+  Send,
+  Clock,
+  UserCheck,
+  LogOut,
+  AlertCircle
 } from 'lucide-react';
 
 const GUEST_CATEGORIES = [
@@ -1215,13 +1224,28 @@ export default function CmsPortal({
   onContentUpdated,
   onSimulateQrScan
 }) {
+  const [username, setUsername] = useState('admin');
   const [passcode, setPasscode] = useState('wedding2026');
+  const [currentUser, setCurrentUser] = useState(null);
   const [authenticated, setAuthenticated] = useState(false);
   const [authError, setAuthError] = useState('');
 
-  // Top-level studio mode: 'builder' | 'all-text' | 'themes' | 'guests' | 'print-qrs' | 'revisions'
+  // Top-level studio mode: 'builder' | 'all-text' | 'themes' | 'guests' | 'print-qrs' | 'approvals' | 'users' | 'revisions'
   const [studioMode, setStudioMode] = useState('builder');
   const [globalTextFilter, setGlobalTextFilter] = useState('');
+
+  // User management & Approval flow state
+  const [showNewUserModal, setShowNewUserModal] = useState(false);
+  const [newUserForm, setNewUserForm] = useState({
+    username: '',
+    passcode: '',
+    displayName: '',
+    role: 'editor'
+  });
+  const [editorProposalNote, setEditorProposalNote] = useState('');
+  const [showProposalModal, setShowProposalModal] = useState(false);
+  const [rejectingProposalId, setRejectingProposalId] = useState(null);
+  const [rejectionNote, setRejectionNote] = useState('');
 
   // Active page inside Visual Drag & Drop Builder: 'aboutUs' | 'ceremony' | 'reception' | 'rsvpPage' | 'weddingPartyPage' | 'heroTabs'
   const [builderPage, setBuilderPage] = useState('aboutUs');
@@ -1352,18 +1376,22 @@ export default function CmsPortal({
   }
 
   async function handleLogin(e) {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     setAuthError('');
     try {
       const res = await fetch('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ passcode })
+        body: JSON.stringify({
+          username: username.trim(),
+          passcode: passcode.trim()
+        })
       });
       const data = await res.json();
       if (!res.ok) {
-        setAuthError(data.error || 'Invalid passcode');
+        setAuthError(data.error || 'Invalid credentials');
       } else {
+        setCurrentUser(data.user);
         setAuthenticated(true);
         const recovered = await maybeAutoRecoverFromLocalStorage(data.db);
         const activeData = recovered || data;
@@ -1379,10 +1407,14 @@ export default function CmsPortal({
   async function fetchAdminData() {
     try {
       const res = await fetch('/api/admin/data', {
-        headers: { 'x-admin-passcode': passcode }
+        headers: {
+          'x-admin-passcode': passcode,
+          'x-cms-username': currentUser?.username || username
+        }
       });
       const data = await res.json();
       if (res.ok) {
+        if (data.user) setCurrentUser(data.user);
         const recovered = await maybeAutoRecoverFromLocalStorage(data.db);
         const activeData = recovered || data;
         setCmsDb(activeData.db);
@@ -1396,13 +1428,25 @@ export default function CmsPortal({
   async function publishAllChanges(options = {}) {
     if (!cmsDb) return;
     const silent = Boolean(options?.silentAutoSave);
-    setSavingStatus(silent ? 'Auto-saving to disk...' : 'Publishing changes...');
+    const isEditor = currentUser?.role === 'editor';
+    if (silent && isEditor) {
+      // Don't auto-save draft proposals on editor typing
+      return;
+    }
+    setSavingStatus(
+      isEditor
+        ? 'Submitting change proposal for Admin approval...'
+        : silent
+        ? 'Auto-saving to disk...'
+        : 'Publishing changes live...'
+    );
     try {
       const res = await fetch('/api/admin/publish-all', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-passcode': passcode
+          'x-admin-passcode': passcode,
+          'x-cms-username': currentUser?.username || username
         },
         body: JSON.stringify({
           siteSettings: cmsDb.siteSettings,
@@ -1410,28 +1454,153 @@ export default function CmsPortal({
           ceremony: cmsDb.ceremony,
           reception: cmsDb.reception,
           weddingPartyPage: cmsDb.weddingPartyPage,
-          rsvpPage: cmsDb.rsvpPage
+          rsvpPage: cmsDb.rsvpPage,
+          changeSummary: editorProposalNote || 'Visual layout and content update'
         })
       });
       const data = await res.json();
       if (res.ok) {
-        if (!silent) {
-          setCmsDb(data.db);
-        }
+        setCmsDb(data.db);
         setAnalytics(data.analytics);
         applyThemeAndCustomColors(cmsDb.siteSettings);
-        if (cmsDb.siteSettings?.adminPasscode) {
-          setPasscode(cmsDb.siteSettings.adminPasscode);
-        }
         setHasUnsavedChanges(false);
-        setSavingStatus(silent ? '✓ Auto-Saved to Disk' : '✓ All Changes Published Live!');
+        if (data.pendingApproval) {
+          setSavingStatus('✓ Change proposal submitted to Admin Approval Queue!');
+          setShowProposalModal(false);
+          setEditorProposalNote('');
+        } else {
+          setSavingStatus(silent ? '✓ Auto-Saved to Disk' : '✓ All Changes Published Live! (Auto-Approved)');
+        }
         if (onContentUpdated) onContentUpdated();
-        setTimeout(() => setSavingStatus(''), 2800);
+        setTimeout(() => setSavingStatus(''), 3500);
       } else {
         setSavingStatus(`Error: ${data.error}`);
       }
     } catch {
       setSavingStatus('Error saving changes.');
+    }
+  }
+
+  async function handleApproveProposal(proposalId) {
+    try {
+      const res = await fetch(`/api/admin/proposals/${proposalId}/approve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-passcode': passcode,
+          'x-cms-username': currentUser?.username || username
+        }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCmsDb(data.db);
+        setAnalytics(data.analytics);
+        applyThemeAndCustomColors(data.db.siteSettings);
+        setSavingStatus('✓ Proposal approved & published live!');
+        if (onContentUpdated) onContentUpdated();
+        setTimeout(() => setSavingStatus(''), 3500);
+      } else {
+        alert(data.error || 'Failed to approve proposal');
+      }
+    } catch {
+      alert('Error approving proposal.');
+    }
+  }
+
+  async function handleRejectProposal(proposalId) {
+    try {
+      const res = await fetch(`/api/admin/proposals/${proposalId}/reject`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-passcode': passcode,
+          'x-cms-username': currentUser?.username || username
+        },
+        body: JSON.stringify({ reviewNote: rejectionNote })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCmsDb(data.db);
+        setAnalytics(data.analytics);
+        setRejectingProposalId(null);
+        setRejectionNote('');
+        setSavingStatus('Proposal rejected.');
+        setTimeout(() => setSavingStatus(''), 3000);
+      } else {
+        alert(data.error || 'Failed to reject proposal');
+      }
+    } catch {
+      alert('Error rejecting proposal.');
+    }
+  }
+
+  async function handleDeleteProposal(proposalId) {
+    try {
+      const res = await fetch(`/api/admin/proposals/${proposalId}`, {
+        method: 'DELETE',
+        headers: {
+          'x-admin-passcode': passcode,
+          'x-cms-username': currentUser?.username || username
+        }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCmsDb(data.db);
+        setSavingStatus('Proposal removed.');
+        setTimeout(() => setSavingStatus(''), 2500);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  async function handleCreateUser(e) {
+    e.preventDefault();
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-passcode': passcode,
+          'x-cms-username': currentUser?.username || username
+        },
+        body: JSON.stringify(newUserForm)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCmsDb(data.db);
+        setShowNewUserModal(false);
+        setNewUserForm({ username: '', passcode: '', displayName: '', role: 'editor' });
+        setSavingStatus(`✓ User account created!`);
+        setTimeout(() => setSavingStatus(''), 3000);
+      } else {
+        alert(data.error || 'Failed to create user');
+      }
+    } catch {
+      alert('Error creating user.');
+    }
+  }
+
+  async function handleDeleteUser(userId, userToDelete) {
+    if (!window.confirm(`Delete CMS user account "${userToDelete}"?`)) return;
+    try {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'x-admin-passcode': passcode,
+          'x-cms-username': currentUser?.username || username
+        }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCmsDb(data.db);
+        setSavingStatus(`✓ User account deleted.`);
+        setTimeout(() => setSavingStatus(''), 3000);
+      } else {
+        alert(data.error || 'Failed to delete user');
+      }
+    } catch {
+      alert('Error deleting user.');
     }
   }
 
@@ -1729,20 +1898,21 @@ export default function CmsPortal({
     document.body.removeChild(link);
   }
 
-  // Login Gate
+  // Login Gate for /cmsdesk
   if (!authenticated) {
     return (
       <div className="cms-overlay">
         <div
           className="surface-card"
           style={{
-            maxWidth: '460px',
+            maxWidth: '490px',
             width: '100%',
             margin: 'auto',
             textAlign: 'center',
-            padding: '2.5rem',
+            padding: '2.5rem 2.25rem',
             border: '1.5px solid var(--border-gold)',
-            borderRadius: '180px 180px 22px 22px'
+            borderRadius: '180px 180px 22px 22px',
+            boxShadow: '0 25px 80px rgba(0,0,0,0.92)'
           }}
         >
           <div
@@ -1756,30 +1926,84 @@ export default function CmsPortal({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              margin: '0 auto 1.25rem'
+              margin: '0 auto 1.15rem'
             }}
           >
             <Lock size={26} />
           </div>
-          <span className="section-kicker">Gothic Noir Website Studio</span>
-          <h2 style={{ fontSize: '2.2rem', marginBottom: '0.35rem' }}>CMS & Theme Builder</h2>
+          <span className="section-kicker">Private CMS Portal • /cmsdesk</span>
+          <h2 style={{ fontSize: '2.1rem', marginBottom: '0.35rem' }}>Gothic Noir CMS Desk</h2>
           <GothicRoseArchOrnament width={170} />
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.92rem', marginBottom: '1.5rem' }}>
-            Unlock the drag-and-drop builder, 5 Romantic Gothic themes, interactive portrait cropper, and guest QR studio.
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.86rem', marginBottom: '1.35rem' }}>
+            Sign in with your role-based credentials. <strong>Admins</strong> have automatic live approval. <strong>Editors</strong> submit draft change proposals for review.
           </p>
 
           <form onSubmit={handleLogin}>
-            <div className="form-group" style={{ textAlign: 'left' }}>
-              <label className="form-label">Admin Passcode</label>
+            <div className="form-group" style={{ textAlign: 'left', marginBottom: '0.85rem' }}>
+              <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Username</span>
+                <span style={{ fontSize: '0.72rem', color: 'var(--accent-secondary)' }}>admin or editor</span>
+              </label>
+              <input
+                type="text"
+                className="form-input"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="e.g. admin or editor"
+                required
+              />
+            </div>
+
+            <div className="form-group" style={{ textAlign: 'left', marginBottom: '1rem' }}>
+              <label className="form-label">Passcode / Password</label>
               <input
                 type="password"
                 className="form-input"
                 value={passcode}
                 onChange={(e) => setPasscode(e.target.value)}
-                placeholder="Default: wedding2026"
+                placeholder="Passcode"
+                required
               />
-              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
-                Default passcode is pre-filled: <strong>wedding2026</strong>
+            </div>
+
+            <div
+              style={{
+                background: 'var(--bg-secondary)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '10px',
+                padding: '0.65rem 0.85rem',
+                marginBottom: '1.25rem',
+                fontSize: '0.74rem',
+                textAlign: 'left',
+                color: 'var(--text-secondary)'
+              }}
+            >
+              <div style={{ fontWeight: 700, color: 'var(--accent-secondary)', marginBottom: '0.25rem' }}>
+                Quick Logins:
+              </div>
+              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  style={{ padding: '0.22rem 0.55rem', fontSize: '0.72rem' }}
+                  onClick={() => {
+                    setUsername('admin');
+                    setPasscode('wedding2026');
+                  }}
+                >
+                  👑 Admin (Auto-Approve)
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  style={{ padding: '0.22rem 0.55rem', fontSize: '0.72rem' }}
+                  onClick={() => {
+                    setUsername('editor');
+                    setPasscode('edit2026');
+                  }}
+                >
+                  📝 Editor (Approval Flow)
+                </button>
               </div>
             </div>
 
@@ -1789,12 +2013,12 @@ export default function CmsPortal({
               </div>
             )}
 
-            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem' }}>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
               <button type="button" className="btn-secondary" style={{ flex: 1 }} onClick={onClose}>
-                Cancel
+                Exit to Website
               </button>
               <button type="submit" className="btn-primary" style={{ flex: 2 }}>
-                Launch Gothic CMS Studio
+                Sign In to CMS Desk
               </button>
             </div>
           </form>
@@ -2407,6 +2631,64 @@ export default function CmsPortal({
 
               <button
                 type="button"
+                onClick={() => setStudioMode('approvals')}
+                style={{
+                  padding: '0.45rem 0.9rem',
+                  borderRadius: '9px',
+                  border: 'none',
+                  fontWeight: 700,
+                  fontSize: '0.8rem',
+                  cursor: 'pointer',
+                  background: studioMode === 'approvals' ? 'var(--accent-primary)' : 'transparent',
+                  color: studioMode === 'approvals' ? '#fff' : 'var(--text-secondary)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem'
+                }}
+              >
+                <ShieldCheck size={15} />
+                <span>Approvals</span>
+                {Boolean((cmsDb?.pendingProposals || []).filter((p) => p.status === 'pending').length) && (
+                  <span
+                    style={{
+                      background: '#ef4444',
+                      color: '#fff',
+                      fontSize: '0.68rem',
+                      fontWeight: 800,
+                      padding: '0.1rem 0.45rem',
+                      borderRadius: '999px',
+                      marginLeft: '0.2rem'
+                    }}
+                  >
+                    {(cmsDb?.pendingProposals || []).filter((p) => p.status === 'pending').length}
+                  </span>
+                )}
+              </button>
+
+              {currentUser?.role === 'admin' && (
+                <button
+                  type="button"
+                  onClick={() => setStudioMode('users')}
+                  style={{
+                    padding: '0.45rem 0.9rem',
+                    borderRadius: '9px',
+                    border: 'none',
+                    fontWeight: 700,
+                    fontSize: '0.8rem',
+                    cursor: 'pointer',
+                    background: studioMode === 'users' ? 'var(--accent-primary)' : 'transparent',
+                    color: studioMode === 'users' ? '#fff' : 'var(--text-secondary)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.4rem'
+                  }}
+                >
+                  <Users size={15} /> CMS Logins ({cmsDb?.cmsUsers?.length || 0})
+                </button>
+              )}
+
+              <button
+                type="button"
                 onClick={() => setStudioMode('revisions')}
                 style={{
                   padding: '0.45rem 0.9rem',
@@ -2427,7 +2709,32 @@ export default function CmsPortal({
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+            {/* Logged in User & Role Pill */}
+            {currentUser && (
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  padding: '0.34rem 0.75rem',
+                  borderRadius: '999px',
+                  fontSize: '0.76rem',
+                  background:
+                    currentUser.role === 'admin' ? 'rgba(212, 168, 83, 0.16)' : 'rgba(59, 130, 246, 0.16)',
+                  border:
+                    currentUser.role === 'admin' ? '1px solid var(--border-gold)' : '1px solid #3b82f6',
+                  color: currentUser.role === 'admin' ? 'var(--accent-secondary)' : '#93c5fd'
+                }}
+              >
+                {currentUser.role === 'admin' ? <Crown size={13} /> : <Edit3 size={13} />}
+                <span>
+                  <strong>{currentUser.displayName || currentUser.username}</strong> (
+                  {currentUser.role === 'admin' ? 'Admin • Auto-Approved' : 'Editor • Approval Required'})
+                </span>
+              </div>
+            )}
+
             {savingStatus && (
               <span
                 style={{
@@ -2511,31 +2818,61 @@ export default function CmsPortal({
               </div>
             )}
 
+            {currentUser?.role === 'editor' ? (
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => setShowProposalModal(true)}
+                style={{
+                  background: '#2563eb',
+                  borderColor: '#3b82f6',
+                  padding: '0.52rem 1.15rem',
+                  fontSize: '0.84rem',
+                  boxShadow: hasUnsavedChanges ? '0 0 18px rgba(37, 99, 235, 0.6)' : 'none'
+                }}
+              >
+                <Send size={15} /> Submit for Admin Approval
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => publishAllChanges({ silentAutoSave: false })}
+                style={{
+                  padding: '0.52rem 1.15rem',
+                  fontSize: '0.84rem',
+                  boxShadow: hasUnsavedChanges ? '0 0 18px rgba(212, 168, 83, 0.6)' : 'none'
+                }}
+              >
+                <Save size={15} /> {hasUnsavedChanges ? 'Publish Changes Live' : 'All Changes Published ✓'}
+              </button>
+            )}
+
             <button
               type="button"
-              className="btn-primary"
-              onClick={() => publishAllChanges({ silentAutoSave: false })}
-              style={{
-                padding: '0.52rem 1.15rem',
-                fontSize: '0.84rem',
-                boxShadow: hasUnsavedChanges ? '0 0 18px rgba(212, 168, 83, 0.6)' : 'none'
+              className="btn-secondary"
+              title="Log out of CMS Desk"
+              style={{ padding: '0.5rem 0.8rem', fontSize: '0.8rem' }}
+              onClick={() => {
+                setAuthenticated(false);
+                setCurrentUser(null);
               }}
             >
-              <Save size={15} /> {hasUnsavedChanges ? 'Save Now (Auto-Saving...)' : 'All Changes Saved ✓'}
+              <LogOut size={14} /> Log Out
             </button>
 
             <button
               type="button"
               className="btn-secondary"
-              style={{ padding: '0.5rem 0.9rem', fontSize: '0.82rem' }}
+              style={{ padding: '0.5rem 0.85rem', fontSize: '0.8rem' }}
               onClick={async () => {
-                if (hasUnsavedChanges) {
+                if (hasUnsavedChanges && currentUser?.role === 'admin') {
                   await publishAllChanges({ silentAutoSave: false });
                 }
                 onClose();
               }}
             >
-              <X size={15} /> Exit Studio
+              <X size={15} /> Exit Desk
             </button>
           </div>
         </header>
@@ -2632,9 +2969,108 @@ export default function CmsPortal({
           </div>
         </div>
 
-        {/* ================================================================= */}
-        {/* MODE: SEARCH & EDIT ALL SITE TEXT (MASTER TEXT EDITOR)            */}
-        {/* ================================================================= */}
+        {/* PERSISTENT NOTICE WHEN SIGNED IN AS EDITOR */}
+        {currentUser?.role === 'editor' && (
+          <div
+            style={{
+              background: 'rgba(37, 99, 235, 0.18)',
+              borderBottom: '1px solid #3b82f6',
+              padding: '0.45rem 1.25rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              fontSize: '0.78rem',
+              color: '#bfdbfe',
+              flexWrap: 'wrap',
+              gap: '0.5rem'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Clock size={15} color="#60a5fa" />
+              <span>
+                <strong>Editor Mode Active:</strong> You can edit any page or text box. When you click <strong>"Submit for Admin Approval"</strong>, your proposed changes will be sent to the Change Approval Queue for an Administrator to approve and publish live.
+              </span>
+            </div>
+            <button
+              type="button"
+              className="btn-secondary"
+              style={{ padding: '0.2rem 0.65rem', fontSize: '0.72rem', borderColor: '#3b82f6', color: '#93c5fd' }}
+              onClick={() => setStudioMode('approvals')}
+            >
+              View My Proposals ({ (cmsDb?.pendingProposals || []).filter((p) => p.status === 'pending').length } Pending) →
+            </button>
+          </div>
+        )}
+
+        {/* EDITOR PROPOSAL SUBMISSION MODAL */}
+        {showProposalModal && (
+          <div
+            className="cms-modal-backdrop"
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,0.85)',
+              zIndex: 99999,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '1rem'
+            }}
+          >
+            <div
+              className="surface-card"
+              style={{
+                maxWidth: '520px',
+                width: '100%',
+                padding: '1.75rem',
+                border: '2px solid #3b82f6',
+                borderRadius: '16px'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Send size={20} color="#60a5fa" />
+                  <h3 style={{ fontSize: '1.4rem', color: '#93c5fd', margin: 0 }}>
+                    Submit Changes for Admin Approval
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowProposalModal(false)}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
+                As an <strong>Editor</strong>, your changes will not alter the live website immediately. Instead, they are packaged into a Change Proposal for an Administrator to inspect and approve.
+              </p>
+              <div className="form-group">
+                <label className="form-label">Brief Description of Your Changes (Optional)</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. Updated Ceremony schedule and cocktail bar drinks"
+                  value={editorProposalNote}
+                  onChange={(e) => setEditorProposalNote(e.target.value)}
+                />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.65rem', marginTop: '1.25rem' }}>
+                <button type="button" className="btn-secondary" onClick={() => setShowProposalModal(false)}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  style={{ background: '#2563eb', borderColor: '#3b82f6' }}
+                  onClick={() => publishAllChanges({ silentAutoSave: false })}
+                >
+                  <Send size={15} /> Send Proposal to Queue
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         {studioMode === 'all-text' && cmsDb && (
           <div className="cms-scroll-body">
             <div className="section-header-box" style={{ marginBottom: '1.5rem' }}>
@@ -6559,6 +6995,489 @@ export default function CmsPortal({
                 ))}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* ================================================================= */}
+        {/* MODE 5: CHANGE APPROVAL QUEUE (ADMIN & EDITOR FLOW)               */}
+        {/* ================================================================= */}
+        {studioMode === 'approvals' && cmsDb && (
+          <div className="cms-scroll-body">
+            <div className="section-header-box" style={{ marginBottom: '1.5rem' }}>
+              <span className="section-kicker">Multi-Role Governance</span>
+              <h2 className="section-title" style={{ fontSize: '2.3rem' }}>
+                Change Approval Queue
+              </h2>
+              <GothicRoseArchOrnament width={210} />
+              <p className="section-subtitle">
+                {currentUser?.role === 'admin'
+                  ? 'Review, approve, or reject website changes submitted by Editors. Approved proposals are published live immediately.'
+                  : 'Track the status of your submitted change proposals. Once an Administrator approves your proposal, it goes live automatically.'}
+              </p>
+            </div>
+
+            <div style={{ maxWidth: '980px', margin: '0 auto' }}>
+              {(!cmsDb.pendingProposals || cmsDb.pendingProposals.length === 0) ? (
+                <div
+                  className="surface-card"
+                  style={{
+                    textAlign: 'center',
+                    padding: '3rem 2rem',
+                    border: '1px dashed var(--border-gold)'
+                  }}
+                >
+                  <ShieldCheck size={40} color="var(--accent-secondary)" style={{ margin: '0 auto 1rem' }} />
+                  <h4 style={{ fontSize: '1.4rem', marginBottom: '0.4rem' }}>No Proposals in Queue</h4>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem' }}>
+                    {currentUser?.role === 'admin'
+                      ? 'No editor changes are currently pending review. When an Editor submits changes, they will appear here.'
+                      : 'You have not submitted any change proposals yet. Edit any page in the Visual Builder and click "Submit for Admin Approval" to send a draft.'}
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.15rem' }}>
+                  {cmsDb.pendingProposals.map((proposal) => {
+                    const isPending = proposal.status === 'pending';
+                    const isApproved = proposal.status === 'approved';
+                    const isRejected = proposal.status === 'rejected';
+                    const sections = Object.keys(proposal.proposedData || {});
+
+                    return (
+                      <div
+                        key={proposal.id}
+                        className="surface-card"
+                        style={{
+                          border: isPending
+                            ? '1.5px solid var(--border-gold)'
+                            : isApproved
+                            ? '1px solid #10b981'
+                            : '1px solid #ef4444',
+                          background: isPending
+                            ? 'var(--bg-accent-subtle)'
+                            : 'var(--bg-card)',
+                          padding: '1.25rem 1.5rem'
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'flex-start',
+                            flexWrap: 'wrap',
+                            gap: '0.75rem',
+                            marginBottom: '0.75rem'
+                          }}
+                        >
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', marginBottom: '0.35rem' }}>
+                              <span
+                                style={{
+                                  fontSize: '0.74rem',
+                                  fontWeight: 800,
+                                  padding: '0.22rem 0.65rem',
+                                  borderRadius: '999px',
+                                  background: isPending
+                                    ? 'rgba(217, 119, 6, 0.25)'
+                                    : isApproved
+                                    ? 'rgba(16, 185, 129, 0.25)'
+                                    : 'rgba(239, 68, 68, 0.25)',
+                                  color: isPending ? '#fde68a' : isApproved ? '#a7f3d0' : '#fca5a5',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.35rem'
+                                }}
+                              >
+                                {isPending && <Clock size={12} />}
+                                {isApproved && <CheckCircle2 size={12} />}
+                                {isRejected && <XCircle size={12} />}
+                                <span>
+                                  {isPending ? 'Pending Admin Review' : isApproved ? 'Approved & Published Live' : 'Rejected'}
+                                </span>
+                              </span>
+
+                              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                                {new Date(proposal.timestamp).toLocaleString()}
+                              </span>
+                            </div>
+
+                            <h4 style={{ fontSize: '1.35rem', margin: '0 0 0.35rem 0' }}>
+                              {proposal.summary || 'Content & Layout Update Proposal'}
+                            </h4>
+
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                              Submitted by <strong>{proposal.submittedBy?.displayName || 'Editor'}</strong> (
+                              @{proposal.submittedBy?.username || 'editor'}) • Role: {proposal.submittedBy?.role || 'editor'}
+                            </div>
+                          </div>
+
+                          {currentUser?.role === 'admin' && (
+                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                              {isPending && (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="btn-primary"
+                                    style={{
+                                      background: '#059669',
+                                      borderColor: '#10b981',
+                                      padding: '0.45rem 0.95rem',
+                                      fontSize: '0.8rem'
+                                    }}
+                                    onClick={() => handleApproveProposal(proposal.id)}
+                                  >
+                                    <Check size={14} /> Approve & Publish Live
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    className="btn-danger"
+                                    style={{ padding: '0.45rem 0.85rem', fontSize: '0.8rem' }}
+                                    onClick={() => setRejectingProposalId(proposal.id)}
+                                  >
+                                    <X size={14} /> Reject
+                                  </button>
+                                </>
+                              )}
+
+                              <button
+                                type="button"
+                                title="Delete proposal record"
+                                className="btn-secondary"
+                                style={{ padding: '0.45rem 0.65rem' }}
+                                onClick={() => handleDeleteProposal(proposal.id)}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        {sections.length > 0 && (
+                          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.65rem' }}>
+                            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', alignSelf: 'center' }}>
+                              Affected Sections:
+                            </span>
+                            {sections.map((sec) => (
+                              <span
+                                key={sec}
+                                style={{
+                                  fontSize: '0.72rem',
+                                  padding: '0.15rem 0.5rem',
+                                  borderRadius: '6px',
+                                  background: 'var(--bg-secondary)',
+                                  border: '1px solid var(--border-color)',
+                                  color: 'var(--accent-secondary)'
+                                }}
+                              >
+                                {sec}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {proposal.reviewNote && (
+                          <div
+                            style={{
+                              marginTop: '0.75rem',
+                              padding: '0.5rem 0.75rem',
+                              borderRadius: '8px',
+                              background: 'rgba(239, 68, 68, 0.1)',
+                              border: '1px solid rgba(239, 68, 68, 0.3)',
+                              fontSize: '0.8rem',
+                              color: '#fca5a5'
+                            }}
+                          >
+                            <strong>Reviewer Note:</strong> {proposal.reviewNote}
+                          </div>
+                        )}
+
+                        {proposal.reviewedBy && (
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
+                            Reviewed by {proposal.reviewedBy.displayName} (@{proposal.reviewedBy.username}) on{' '}
+                            {new Date(proposal.reviewedAt).toLocaleString()}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Rejection Note Modal */}
+            {rejectingProposalId && (
+              <div
+                className="cms-modal-backdrop"
+                style={{
+                  position: 'fixed',
+                  inset: 0,
+                  background: 'rgba(0,0,0,0.85)',
+                  zIndex: 99999,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '1rem'
+                }}
+              >
+                <div className="surface-card" style={{ maxWidth: '480px', width: '100%', padding: '1.5rem', border: '2px solid #ef4444' }}>
+                  <h4 style={{ fontSize: '1.3rem', color: '#fca5a5', marginBottom: '0.5rem' }}>
+                    Reject Change Proposal
+                  </h4>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+                    Optionally add a note explaining why this proposal was rejected so the Editor knows what to adjust.
+                  </p>
+                  <div className="form-group">
+                    <label className="form-label">Feedback / Reason for Rejection</label>
+                    <textarea
+                      rows={3}
+                      className="form-textarea"
+                      placeholder="e.g. Please keep the dinner entrée count as 3 options instead of 4..."
+                      value={rejectionNote}
+                      onChange={(e) => setRejectionNote(e.target.value)}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => {
+                        setRejectingProposalId(null);
+                        setRejectionNote('');
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-danger"
+                      onClick={() => handleRejectProposal(rejectingProposalId)}
+                    >
+                      Confirm Rejection
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ================================================================= */}
+        {/* MODE 6: CMS USER ACCOUNTS & ROLES (ADMIN ONLY)                    */}
+        {/* ================================================================= */}
+        {studioMode === 'users' && currentUser?.role === 'admin' && cmsDb && (
+          <div className="cms-scroll-body">
+            <div className="section-header-box" style={{ marginBottom: '1.5rem' }}>
+              <span className="section-kicker">Access Management</span>
+              <h2 className="section-title" style={{ fontSize: '2.3rem' }}>
+                CMS Logins & Access Roles
+              </h2>
+              <GothicRoseArchOrnament width={210} />
+              <p className="section-subtitle">
+                Create and manage logins with specific roles. <strong>Administrators</strong> have automatic live approval and full settings access. <strong>Editors</strong> can edit all sections and submit change proposals for Admin review.
+              </p>
+            </div>
+
+            <div style={{ maxWidth: '980px', margin: '0 auto' }}>
+              <div
+                className="surface-card"
+                style={{
+                  padding: '1rem 1.4rem',
+                  marginBottom: '1.5rem',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '0.75rem'
+                }}
+              >
+                <div>
+                  <h4 style={{ fontSize: '1.25rem', margin: '0 0 0.25rem 0' }}>
+                    Active CMS User Accounts ({cmsDb.cmsUsers?.length || 0})
+                  </h4>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0 }}>
+                    Logins are accessible exclusively via <code>/cmsdesk</code>.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => setShowNewUserModal(true)}
+                  style={{ padding: '0.48rem 0.95rem', fontSize: '0.82rem' }}
+                >
+                  <Plus size={15} /> Add New CMS User
+                </button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
+                {(cmsDb.cmsUsers || []).map((user) => {
+                  const isAdmin = user.role === 'admin';
+                  return (
+                    <div
+                      key={user.id}
+                      className="surface-card"
+                      style={{
+                        padding: '1.25rem',
+                        border: isAdmin ? '1.5px solid var(--border-gold)' : '1px solid #3b82f6',
+                        position: 'relative'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                        <span
+                          style={{
+                            fontSize: '0.74rem',
+                            fontWeight: 800,
+                            padding: '0.22rem 0.65rem',
+                            borderRadius: '999px',
+                            background: isAdmin ? 'rgba(212, 168, 83, 0.2)' : 'rgba(59, 130, 246, 0.2)',
+                            color: isAdmin ? 'var(--accent-secondary)' : '#93c5fd',
+                            border: isAdmin ? '1px solid var(--border-gold)' : '1px solid #3b82f6',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem'
+                          }}
+                        >
+                          {isAdmin ? <Crown size={13} /> : <Edit3 size={13} />}
+                          <span>{isAdmin ? 'Administrator (Auto-Approval)' : 'Editor (Approval Required)'}</span>
+                        </span>
+
+                        {(cmsDb.cmsUsers || []).filter((u) => u.role === 'admin').length > 1 || !isAdmin ? (
+                          <button
+                            type="button"
+                            title="Delete user"
+                            className="btn-danger"
+                            style={{ padding: '0.3rem 0.5rem' }}
+                            onClick={() => handleDeleteUser(user.id, user.username)}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        ) : null}
+                      </div>
+
+                      <h4 style={{ fontSize: '1.3rem', marginBottom: '0.35rem' }}>
+                        {user.displayName || user.username}
+                      </h4>
+
+                      <div style={{ fontSize: '0.82rem', display: 'flex', flexDirection: 'column', gap: '0.3rem', color: 'var(--text-secondary)' }}>
+                        <div>
+                          <strong>Username:</strong> <span style={{ color: 'var(--text-primary)' }}>{user.username}</span>
+                        </div>
+                        <div>
+                          <strong>Passcode:</strong> <span style={{ color: 'var(--accent-secondary)', fontFamily: 'monospace' }}>{user.passcode}</span>
+                        </div>
+                        <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
+                          Created: {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Initial Setup'}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Create New User Modal */}
+            {showNewUserModal && (
+              <div
+                className="cms-modal-backdrop"
+                style={{
+                  position: 'fixed',
+                  inset: 0,
+                  background: 'rgba(0,0,0,0.85)',
+                  zIndex: 99999,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '1rem'
+                }}
+              >
+                <form
+                  onSubmit={handleCreateUser}
+                  className="surface-card"
+                  style={{
+                    maxWidth: '480px',
+                    width: '100%',
+                    padding: '1.75rem',
+                    border: '2px solid var(--accent-secondary)',
+                    borderRadius: '16px'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <UserPlus size={20} color="var(--accent-secondary)" />
+                      <h3 style={{ fontSize: '1.4rem', margin: 0 }}>Create New CMS Account</h3>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowNewUserModal(false)}
+                      style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Username (lowercase, no spaces) *</label>
+                    <input
+                      type="text"
+                      required
+                      className="form-input"
+                      placeholder="e.g. weddingplanner"
+                      value={newUserForm.username}
+                      onChange={(e) =>
+                        setNewUserForm({ ...newUserForm, username: e.target.value.toLowerCase().replace(/\s+/g, '') })
+                      }
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Passcode / Password *</label>
+                    <input
+                      type="text"
+                      required
+                      className="form-input"
+                      placeholder="e.g. plan2027"
+                      value={newUserForm.passcode}
+                      onChange={(e) => setNewUserForm({ ...newUserForm, passcode: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Display Name (e.g. Jane • Wedding Coordinator)</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="Jane Planner"
+                      value={newUserForm.displayName}
+                      onChange={(e) => setNewUserForm({ ...newUserForm, displayName: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Access Role *</label>
+                    <select
+                      className="form-select"
+                      value={newUserForm.role}
+                      onChange={(e) => setNewUserForm({ ...newUserForm, role: e.target.value })}
+                    >
+                      <option value="editor">
+                        📝 Editor — Can edit pages & submit change proposals (Requires Admin Approval)
+                      </option>
+                      <option value="admin">
+                        👑 Administrator — Full access, live auto-approval, and reviews editor proposals
+                      </option>
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.65rem', marginTop: '1.25rem' }}>
+                    <button type="button" className="btn-secondary" onClick={() => setShowNewUserModal(false)}>
+                      Cancel
+                    </button>
+                    <button type="submit" className="btn-primary">
+                      <Plus size={15} /> Create User Account
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
           </div>
         )}
       </div>

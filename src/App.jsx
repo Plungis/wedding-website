@@ -74,12 +74,18 @@ export function applyThemeAndCustomColors(siteSettings) {
   }
 }
 
+function checkIsCmsDesk() {
+  if (typeof window === 'undefined') return false;
+  const path = window.location.pathname.toLowerCase().replace(/\/$/, '');
+  return path === '/cmsdesk' || window.location.search.includes('cmsdesk') || window.location.hash === '#cmsdesk';
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('about');
   const [siteData, setSiteData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [qrCodeFromUrl, setQrCodeFromUrl] = useState('');
-  const [cmsOpen, setCmsOpen] = useState(false);
+  const [cmsOpen, setCmsOpen] = useState(() => checkIsCmsDesk());
   const [unlockedWeddingPartyGuest, setUnlockedWeddingPartyGuest] = useState(null);
   const [adminBypassConstruction, setAdminBypassConstruction] = useState(false);
 
@@ -101,13 +107,36 @@ export default function App() {
   useEffect(() => {
     loadContent();
 
+    function onLocationChange() {
+      if (checkIsCmsDesk()) {
+        setCmsOpen(true);
+      }
+    }
+    window.addEventListener('popstate', onLocationChange);
+    window.addEventListener('hashchange', onLocationChange);
+
     const params = new URLSearchParams(window.location.search);
     const scannedCode = params.get('rsvp') || params.get('code');
     if (scannedCode) {
       setQrCodeFromUrl(scannedCode.trim().toUpperCase());
       setActiveTab('rsvp');
     }
+
+    return () => {
+      window.removeEventListener('popstate', onLocationChange);
+      window.removeEventListener('hashchange', onLocationChange);
+    };
   }, [loadContent]);
+
+  function handleCloseCms() {
+    setCmsOpen(false);
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname.toLowerCase().replace(/\/$/, '');
+      if (path === '/cmsdesk' || window.location.hash === '#cmsdesk') {
+        window.history.pushState({}, '', '/');
+      }
+    }
+  }
 
   function handleSelectTab(tabId) {
     setActiveTab(tabId);
@@ -146,14 +175,13 @@ export default function App() {
           reception={reception}
           sampleInvites={sampleInvites}
           initialCode={qrCodeFromUrl}
-          onOpenCms={() => setCmsOpen(true)}
           onPreviewFullSite={() => setAdminBypassConstruction(true)}
           onRsvpSubmitted={loadContent}
           onUnlockWeddingParty={(guest) => setUnlockedWeddingPartyGuest(guest)}
         />
         <CmsPortal
           isOpen={cmsOpen}
-          onClose={() => setCmsOpen(false)}
+          onClose={handleCloseCms}
           onContentUpdated={loadContent}
           onSimulateQrScan={handleSimulateQrScan}
         />
@@ -255,13 +283,6 @@ export default function App() {
             {unlockedWeddingPartyGuest
               ? `${siteSettings?.weddingPartyBtnText || 'Wedding Party Portal'} (Unlocked ✓)`
               : siteSettings?.weddingPartyBtnText || 'Wedding Party Portal'}
-          </button>
-          <button
-            type="button"
-            className="cms-launch-btn"
-            onClick={() => setCmsOpen(true)}
-          >
-            <Settings size={14} /> Open Drag & Drop CMS Studio
           </button>
         </div>
       </div>
@@ -422,16 +443,13 @@ export default function App() {
           <button className="btn-secondary" onClick={() => handleSelectTab('rsvp')}>
             <QrCode size={15} /> QR Code RSVP
           </button>
-          <button className="btn-secondary" onClick={() => setCmsOpen(true)}>
-            <Settings size={15} /> Launch Drag & Drop CMS Builder (Passcode: wedding2026)
-          </button>
         </div>
       </footer>
 
-      {/* Robust Drag-and-Drop Back-End CMS Studio */}
+      {/* Robust Drag-and-Drop Back-End CMS Studio (Accessible via /cmsdesk) */}
       <CmsPortal
         isOpen={cmsOpen}
-        onClose={() => setCmsOpen(false)}
+        onClose={handleCloseCms}
         onContentUpdated={loadContent}
         onSimulateQrScan={handleSimulateQrScan}
       />

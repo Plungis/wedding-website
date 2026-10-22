@@ -108,15 +108,6 @@ export default function UnderConstructionView({
                 <Eye size={13} /> Preview Full Site (Admin Bypass)
               </button>
             )}
-            {onOpenCms && (
-              <button
-                type="button"
-                className="cms-launch-btn"
-                onClick={onOpenCms}
-              >
-                <Settings size={14} /> Open Drag & Drop CMS Studio
-              </button>
-            )}
           </div>
         </div>
       )}
@@ -426,11 +417,6 @@ export default function UnderConstructionView({
             {onPreviewFullSite && (
               <button type="button" className="btn-secondary" onClick={onPreviewFullSite} style={{ fontSize: '0.78rem', padding: '0.45rem 0.9rem' }}>
                 <Eye size={14} /> Preview Full Website (Admin)
-              </button>
-            )}
-            {onOpenCms && (
-              <button type="button" className="btn-secondary" onClick={onOpenCms} style={{ fontSize: '0.78rem', padding: '0.45rem 0.9rem' }}>
-                <Settings size={14} /> Open CMS Studio (Passcode: wedding2026)
               </button>
             )}
           </div>
