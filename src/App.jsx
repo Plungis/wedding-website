@@ -18,23 +18,23 @@ import CmsPortal from './components/CmsPortal.jsx';
 const BIG_TABS = [
   {
     id: 'about',
-    step: '01 • Our Story',
+    step: '01 • Kindred Spirits',
     title: 'About Us',
-    subtitle: 'Couple profiles, our timeline & wedding party',
+    subtitle: 'Our autumn story, portraits & wedding party',
     icon: Heart
   },
   {
     id: 'ceremony',
-    step: '02 • The Vows',
+    step: '02 • Twilight Vows',
     title: 'Ceremony',
-    subtitle: 'Garden venue, timing, attire & shuttles',
+    subtitle: 'Candlelit manor gardens, attire & shuttles',
     icon: Sparkles
   },
   {
     id: 'reception',
-    step: '03 • Celebrate',
+    step: '03 • The Feast',
     title: 'Reception',
-    subtitle: 'Dinner menu, cocktails, band & hotel blocks',
+    subtitle: 'Conservatory banquet, apothecary bar & hotels',
     icon: Wine
   },
   {
@@ -59,7 +59,7 @@ export default function App() {
       const data = await res.json();
       if (res.ok) {
         setSiteData(data);
-        const theme = data.siteSettings?.theme || 'sage-gold';
+        const theme = data.siteSettings?.theme || 'fall-goth';
         document.documentElement.setAttribute('data-theme', theme);
       }
     } catch (err) {
@@ -140,26 +140,26 @@ export default function App() {
         style={{
           backgroundImage: `url(${
             siteSettings?.heroBannerUrl ||
-            'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1800&q=85'
+            'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=1800&q=85'
           })`
         }}
       >
         <div className="wedding-hero-inner">
-          <span className="hero-eyebrow">Save The Date & Celebrate With Us</span>
+          <span className="hero-eyebrow">✦ Autumn Twilight Celebration • Till Death Do Us Party ✦</span>
           <h1 className="hero-couple-names">
             {siteSettings?.coupleNames || 'Elena Vance & Julian Sterling'}
           </h1>
           <p className="hero-tagline">
             {siteSettings?.heroTagline ||
-              'Together with our families, we joyfully invite you to celebrate our marriage.'}
+              'Under the October harvest moon and falling crimson leaves, we invite you to celebrate our union.'}
           </p>
 
           <div className="hero-meta-pills">
             <span className="hero-pill">
-              <Calendar size={15} /> {siteSettings?.weddingDateDisplay || 'Saturday, June 19, 2027'}
+              <Calendar size={15} color="var(--accent-secondary)" /> {siteSettings?.weddingDateDisplay || 'Saturday, October 23, 2027'}
             </span>
             <span className="hero-pill">
-              <MapPin size={15} /> {siteSettings?.locationSummary || 'St. Helena • Napa Valley, CA'}
+              <MapPin size={15} color="var(--accent-secondary)" /> {siteSettings?.locationSummary || 'Tarrytown • Hudson Valley, NY'}
             </span>
           </div>
         </div>

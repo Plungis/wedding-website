@@ -289,6 +289,7 @@ export default function RsvpTab({
       <div className="section-header-box">
         <span className="section-kicker">04 • Personalized QR Invitation</span>
         <h2 className="section-title">Respond to Your Invitation</h2>
+        <div className="goth-divider">✦ 🌙 ✦</div>
         <p className="section-subtitle">
           Scan the unique QR code included with your wedding invitation—or enter your personal invitation code below—to unlock your household’s RSVP card.
           {rsvpDeadline ? ` Kindly respond by ${rsvpDeadline}.` : ''}
@@ -306,13 +307,13 @@ export default function RsvpTab({
           }}
         >
           <div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.16)', padding: '0.35rem 0.85rem', borderRadius: '999px', fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '0.85rem' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(209, 142, 71, 0.18)', border: '1px solid var(--border-gold)', color: 'var(--accent-secondary)', padding: '0.35rem 0.85rem', borderRadius: '999px', fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '0.85rem' }}>
               <QrCode size={15} /> Instant QR Code Access
             </div>
-            <h3 style={{ fontSize: '2.1rem', marginBottom: '0.5rem', color: '#fff' }}>
+            <h3 style={{ fontSize: '2.1rem', marginBottom: '0.5rem', color: '#f9f3eb' }}>
               Have Your Wedding QR Card?
             </h3>
-            <p style={{ color: 'rgba(255,255,255,0.86)', fontSize: '0.94rem', marginBottom: '1.25rem' }}>
+            <p style={{ color: 'rgba(244, 236, 225, 0.86)', fontSize: '0.94rem', marginBottom: '1.25rem' }}>
               Point your phone’s camera at the QR code on your paper invitation to open your RSVP automatically, use our built-in camera scanner, or type your 9-character code (e.g., <strong>ROSE-4829</strong>).
             </p>
 
@@ -321,8 +322,7 @@ export default function RsvpTab({
                 <button
                   type="button"
                   onClick={startCameraScanner}
-                  className="btn-secondary"
-                  style={{ background: '#ffffff', color: 'var(--text-primary)', border: 'none' }}
+                  className="btn-primary"
                 >
                   <Camera size={17} /> Scan QR with Camera
                 </button>
@@ -339,9 +339,9 @@ export default function RsvpTab({
               <label
                 className="btn-secondary"
                 style={{
-                  background: 'rgba(255,255,255,0.14)',
-                  color: '#ffffff',
-                  borderColor: 'rgba(255,255,255,0.3)',
+                  background: 'rgba(255,255,255,0.08)',
+                  color: '#f4ece1',
+                  borderColor: 'var(--border-gold)',
                   cursor: 'pointer'
                 }}
               >
@@ -363,11 +363,12 @@ export default function RsvpTab({
               lookupInvitation(inputCode);
             }}
             style={{
-              background: '#ffffff',
+              background: 'var(--bg-card)',
               color: 'var(--text-primary)',
+              border: '1px solid var(--border-gold)',
               padding: '1.6rem',
               borderRadius: '18px',
-              boxShadow: '0 14px 34px rgba(0,0,0,0.18)'
+              boxShadow: '0 14px 34px rgba(0,0,0,0.45)'
             }}
           >
             <label className="form-label" style={{ display: 'block', marginBottom: '0.5rem' }}>
@@ -481,9 +482,9 @@ export default function RsvpTab({
                       lookupInvitation(inv.code);
                     }}
                     style={{
-                      background: isSelected ? 'var(--accent-primary)' : '#ffffff',
+                      background: isSelected ? 'linear-gradient(145deg, var(--accent-primary), #4d1020)' : 'var(--bg-card)',
                       color: isSelected ? '#ffffff' : 'var(--text-primary)',
-                      border: `2px solid ${isSelected ? 'var(--accent-primary)' : 'var(--border-color)'}`,
+                      border: `1.5px solid ${isSelected ? 'var(--accent-secondary)' : 'var(--border-color)'}`,
                       borderRadius: '14px',
                       padding: '0.9rem',
                       cursor: 'pointer',

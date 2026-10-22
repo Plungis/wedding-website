@@ -20,6 +20,7 @@ export default function ReceptionTab({ reception, onSelectTab }) {
       <div className="section-header-box">
         <span className="section-kicker">03 • Dinner, Wine & Dancing</span>
         <h2 className="section-title">{reception.headline}</h2>
+        <div className="goth-divider">✦ 🕯️ ✦</div>
         <p className="section-subtitle">{reception.subheadline}</p>
       </div>
 

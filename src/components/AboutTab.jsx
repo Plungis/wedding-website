@@ -27,6 +27,7 @@ export default function AboutTab({ aboutUs, siteSettings, onSelectTab }) {
       <div className="section-header-box">
         <span className="section-kicker">01 • About The Couple</span>
         <h2 className="section-title">{aboutUs.headline}</h2>
+        <div className="goth-divider">✦ 🍂 ✦</div>
         <p className="section-subtitle">{aboutUs.subheadline}</p>
       </div>
 
@@ -35,7 +36,8 @@ export default function AboutTab({ aboutUs, siteSettings, onSelectTab }) {
         className="surface-card"
         style={{
           marginBottom: '2.5rem',
-          background: 'linear-gradient(135deg, var(--bg-card) 0%, var(--bg-secondary) 100%)',
+          background: 'linear-gradient(135deg, var(--bg-card) 0%, var(--bg-accent-subtle) 100%)',
+          border: '1px solid var(--border-gold)',
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
           gap: '2rem',
@@ -43,10 +45,10 @@ export default function AboutTab({ aboutUs, siteSettings, onSelectTab }) {
         }}
       >
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--accent-secondary)', marginBottom: '0.6rem', fontWeight: 600, fontSize: '0.85rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--accent-secondary)', marginBottom: '0.6rem', fontWeight: 600, fontSize: '0.85rem', letterSpacing: '0.08em' }}>
             <Heart size={16} fill="currentColor" /> A NOTE FROM {siteSettings?.shortNames?.toUpperCase()}
           </div>
-          <blockquote className="serif-font" style={{ fontSize: '1.55rem', fontStyle: 'italic', color: 'var(--text-primary)', marginBottom: '0.75rem' }}>
+          <blockquote className="serif-font" style={{ fontSize: '1.65rem', fontStyle: 'italic', color: 'var(--text-primary)', marginBottom: '0.75rem' }}>
             “{aboutUs.introQuote}”
           </blockquote>
           <p style={{ fontSize: '0.92rem', color: 'var(--text-secondary)' }}>
@@ -60,33 +62,33 @@ export default function AboutTab({ aboutUs, siteSettings, onSelectTab }) {
             gridTemplateColumns: 'repeat(3, 1fr)',
             gap: '0.85rem',
             textAlign: 'center',
-            background: 'var(--bg-card)',
+            background: 'var(--bg-secondary)',
             padding: '1.35rem',
             borderRadius: '18px',
-            border: '1px solid var(--border-color)'
+            border: '1px solid var(--border-gold)'
           }}
         >
           <div>
-            <div className="serif-font" style={{ fontSize: '2.5rem', fontWeight: 700, color: 'var(--accent-primary)' }}>
+            <div className="serif-font" style={{ fontSize: '2.6rem', fontWeight: 700, color: 'var(--accent-secondary)' }}>
               {countdown.days}
             </div>
-            <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-muted)', fontWeight: 600 }}>
+            <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-secondary)', fontWeight: 600 }}>
               Days
             </div>
           </div>
           <div>
-            <div className="serif-font" style={{ fontSize: '2.5rem', fontWeight: 700, color: 'var(--accent-primary)' }}>
+            <div className="serif-font" style={{ fontSize: '2.6rem', fontWeight: 700, color: 'var(--accent-secondary)' }}>
               {countdown.hours}
             </div>
-            <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-muted)', fontWeight: 600 }}>
+            <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-secondary)', fontWeight: 600 }}>
               Hours
             </div>
           </div>
           <div>
-            <div className="serif-font" style={{ fontSize: '2.5rem', fontWeight: 700, color: 'var(--accent-primary)' }}>
+            <div className="serif-font" style={{ fontSize: '2.6rem', fontWeight: 700, color: 'var(--accent-secondary)' }}>
               {countdown.mins}
             </div>
-            <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-muted)', fontWeight: 600 }}>
+            <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-secondary)', fontWeight: 600 }}>
               Minutes
             </div>
           </div>
@@ -97,10 +99,12 @@ export default function AboutTab({ aboutUs, siteSettings, onSelectTab }) {
       <div className="grid-2" style={{ marginBottom: '3.5rem' }}>
         {(aboutUs.coupleProfiles || []).map((person) => (
           <div key={person.id} className="couple-card">
-            <img src={person.photo} alt={person.name} className="couple-card-img" />
+            <div className="couple-card-img-wrap">
+              <img src={person.photo} alt={person.name} className="couple-card-img" />
+            </div>
             <div className="couple-card-body">
               <span className="role-badge">{person.role}</span>
-              <h3 style={{ fontSize: '2rem', marginBottom: '0.65rem' }}>{person.name}</h3>
+              <h3 style={{ fontSize: '2.1rem', marginBottom: '0.65rem' }}>{person.name}</h3>
               <p style={{ color: 'var(--text-secondary)', marginBottom: '1.15rem', fontSize: '0.96rem' }}>
                 {person.bio}
               </p>
@@ -108,17 +112,18 @@ export default function AboutTab({ aboutUs, siteSettings, onSelectTab }) {
                 <div
                   style={{
                     background: 'var(--bg-accent-subtle)',
+                    border: '1px solid var(--border-gold)',
                     padding: '0.75rem 1rem',
                     borderRadius: '12px',
                     fontSize: '0.86rem',
-                    color: 'var(--accent-primary)',
+                    color: 'var(--text-primary)',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '0.5rem'
                   }}
                 >
-                  <Sparkles size={16} style={{ flexShrink: 0 }} />
-                  <span><strong>Fun Fact:</strong> {person.funFact}</span>
+                  <Sparkles size={16} color="var(--accent-secondary)" style={{ flexShrink: 0 }} />
+                  <span><strong style={{ color: 'var(--accent-secondary)' }}>Fun Fact:</strong> {person.funFact}</span>
                 </div>
               )}
             </div>

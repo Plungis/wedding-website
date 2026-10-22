@@ -20,6 +20,7 @@ export default function CeremonyTab({ ceremony, onSelectTab }) {
       <div className="section-header-box">
         <span className="section-kicker">02 • The Vow Exchange</span>
         <h2 className="section-title">{ceremony.headline}</h2>
+        <div className="goth-divider">✦ 🥀 ✦</div>
         <p className="section-subtitle">{ceremony.subheadline}</p>
       </div>
 

@@ -745,7 +745,7 @@ export default function CmsPortal({
                     style={{
                       marginBottom: '1.75rem',
                       border: '2px solid var(--accent-secondary)',
-                      background: '#fff'
+                      background: 'var(--bg-card)'
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
@@ -1225,7 +1225,7 @@ export default function CmsPortal({
                     <label className="form-label">Website Color Palette Theme</label>
                     <select
                       className="form-select"
-                      value={cmsDb.siteSettings.theme || 'sage-gold'}
+                      value={cmsDb.siteSettings.theme || 'fall-goth'}
                       onChange={(e) =>
                         setCmsDb({
                           ...cmsDb,
@@ -1233,10 +1233,10 @@ export default function CmsPortal({
                         })
                       }
                     >
-                      <option value="sage-gold">Botanical Sage & Champagne Gold</option>
-                      <option value="terracotta-sun">Tuscan Terracotta & Warm Amber</option>
-                      <option value="midnight-botanical">Midnight Navy & Antique Gold</option>
-                      <option value="blush-champagne">English Rose Blush & Champagne</option>
+                      <option value="fall-goth">Fall Goth • Velvet Plum, Oxblood & Burnished Copper (Default)</option>
+                      <option value="victorian-noir">Victorian Noir • Midnight Manor & Antique Gold</option>
+                      <option value="harvest-twilight">Harvest Twilight • Deep Espresso, Crimson & Amber</option>
+                      <option value="sage-gold">Daylight Botanical • Sage & Champagne Gold</option>
                     </select>
                   </div>
 
