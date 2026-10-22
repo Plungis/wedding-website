@@ -32,8 +32,40 @@ import {
   Columns,
   Move,
   ZoomIn,
-  Scissors
+  Scissors,
+  Calendar
 } from 'lucide-react';
+
+function toDateTimeLocalValue(isoStr) {
+  if (!isoStr) return '2027-10-23T17:00';
+  // Ensure YYYY-MM-DDTHH:mm format for <input type="datetime-local" />
+  return String(isoStr).slice(0, 16);
+}
+
+function formatIsoToHumanDate(isoStr) {
+  if (!isoStr) return '';
+  const d = new Date(isoStr);
+  if (Number.isNaN(d.getTime())) return isoStr;
+  return d.toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+}
+
+function formatSimpleDateToHuman(dateStr) {
+  if (!dateStr) return '';
+  const parts = String(dateStr).split('-');
+  if (parts.length !== 3) return dateStr;
+  const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+}
 
 export const GOTHIC_THEMES = [
   {
@@ -1449,7 +1481,25 @@ export default function CmsPortal({
                   <div className="grid-2" style={{ gap: '0.6rem' }}>
                     <div className="form-group">
                       <label className="form-label">Date / Year</label>
-                      <input type="text" className="form-input" value={item.year || ''} onChange={(e) => updateItem(idx, 'year', e.target.value)} />
+                      <div style={{ display: 'flex', gap: '0.35rem' }}>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={item.year || ''}
+                          onChange={(e) => updateItem(idx, 'year', e.target.value)}
+                          style={{ flex: 1 }}
+                        />
+                        <input
+                          type="date"
+                          className="form-input"
+                          title="Pick Milestone Date from Calendar"
+                          style={{ width: '42px', padding: '0.35rem', colorScheme: 'dark', cursor: 'pointer' }}
+                          onChange={(e) => {
+                            const formatted = formatSimpleDateToHuman(e.target.value);
+                            if (formatted) updateItem(idx, 'year', formatted);
+                          }}
+                        />
+                      </div>
                     </div>
                     <div className="form-group">
                       <label className="form-label">Location</label>
@@ -2123,6 +2173,118 @@ export default function CmsPortal({
                 </div>
               </div>
 
+              {/* ALWAYS-VISIBLE WEDDING DATE & COUNTDOWN PICKER IN LEFT SIDEBAR */}
+              <div
+                style={{
+                  background: 'var(--bg-secondary)',
+                  border: '1.5px solid var(--border-gold)',
+                  borderRadius: '12px',
+                  padding: '0.85rem'
+                }}
+              >
+                <div
+                  className="form-label"
+                  style={{
+                    marginBottom: '0.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    color: 'var(--accent-secondary)'
+                  }}
+                >
+                  <Calendar size={14} /> Wedding Date & Countdown
+                </div>
+                <div style={{ marginBottom: '0.5rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.22rem' }}>
+                    Pick Date & Ceremony Time (Calendar)
+                  </label>
+                  <input
+                    type="datetime-local"
+                    className="form-input"
+                    value={toDateTimeLocalValue(cmsDb.siteSettings?.weddingDate)}
+                    onChange={(e) => {
+                      const isoVal = e.target.value;
+                      const formatted = formatIsoToHumanDate(isoVal);
+                      setHasUnsavedChanges(true);
+                      setCmsDb({
+                        ...cmsDb,
+                        siteSettings: {
+                          ...cmsDb.siteSettings,
+                          weddingDate: isoVal,
+                          weddingDateDisplay: formatted || cmsDb.siteSettings.weddingDateDisplay
+                        }
+                      });
+                    }}
+                    style={{ padding: '0.45rem 0.65rem', fontSize: '0.8rem', colorScheme: 'dark' }}
+                  />
+                </div>
+                <div style={{ marginBottom: '0.5rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.22rem' }}>
+                    Displayed Date Text on Website
+                  </label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={cmsDb.siteSettings?.weddingDateDisplay || ''}
+                    onChange={(e) => {
+                      setHasUnsavedChanges(true);
+                      setCmsDb({
+                        ...cmsDb,
+                        siteSettings: {
+                          ...cmsDb.siteSettings,
+                          weddingDateDisplay: e.target.value
+                        }
+                      });
+                    }}
+                    placeholder="Saturday, October 23, 2027"
+                    style={{ padding: '0.45rem 0.65rem', fontSize: '0.8rem' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.22rem' }}>
+                    RSVP Deadline (Pick Date or Type)
+                  </label>
+                  <div style={{ display: 'flex', gap: '0.35rem' }}>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={cmsDb.siteSettings?.rsvpDeadline || ''}
+                      onChange={(e) => {
+                        setHasUnsavedChanges(true);
+                        setCmsDb({
+                          ...cmsDb,
+                          siteSettings: {
+                            ...cmsDb.siteSettings,
+                            rsvpDeadline: e.target.value
+                          }
+                        });
+                      }}
+                      placeholder="September 15, 2027"
+                      style={{ padding: '0.45rem 0.65rem', fontSize: '0.8rem', flex: 1 }}
+                    />
+                    <input
+                      type="date"
+                      className="form-input"
+                      title="Pick RSVP Deadline from Calendar"
+                      onChange={(e) => {
+                        const formatted = formatSimpleDateToHuman(e.target.value);
+                        if (formatted) {
+                          setHasUnsavedChanges(true);
+                          setCmsDb({
+                            ...cmsDb,
+                            siteSettings: {
+                              ...cmsDb.siteSettings,
+                              rsvpDeadline: formatted
+                            }
+                          });
+                        }
+                      }}
+                      style={{ width: '42px', padding: '0.35rem', colorScheme: 'dark', cursor: 'pointer' }}
+                    />
+                  </div>
+                </div>
+              </div>
+
               {isBlockPage && currentPageObj && (
                 <>
                   <div
@@ -2486,57 +2648,95 @@ export default function CmsPortal({
                     }}
                   />
 
-                  <div className="grid-2" style={{ gap: '0.6rem' }}>
-                    <div className="form-group">
-                      <label className="form-label">Display Date</label>
-                      <input
-                        type="text"
-                        className="form-input"
-                        value={cmsDb.siteSettings.weddingDateDisplay || ''}
-                        onChange={(e) => {
-                          setHasUnsavedChanges(true);
-                          setCmsDb({ ...cmsDb, siteSettings: { ...cmsDb.siteSettings, weddingDateDisplay: e.target.value } });
-                        }}
-                      />
+                  <div
+                    style={{
+                      background: 'var(--bg-secondary)',
+                      border: '1px solid var(--border-gold)',
+                      borderRadius: '12px',
+                      padding: '0.9rem',
+                      marginBottom: '1rem'
+                    }}
+                  >
+                    <div className="form-label" style={{ color: 'var(--accent-secondary)', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.6rem' }}>
+                      <Calendar size={14} /> Wedding Date, Countdown & RSVP Deadline
                     </div>
-                    <div className="form-group">
-                      <label className="form-label">Countdown ISO Date</label>
-                      <input
-                        type="text"
-                        className="form-input"
-                        value={cmsDb.siteSettings.weddingDate || ''}
-                        onChange={(e) => {
-                          setHasUnsavedChanges(true);
-                          setCmsDb({ ...cmsDb, siteSettings: { ...cmsDb.siteSettings, weddingDate: e.target.value } });
-                        }}
-                      />
+                    <div className="grid-2" style={{ gap: '0.6rem' }}>
+                      <div className="form-group" style={{ marginBottom: '0.5rem' }}>
+                        <label className="form-label">Pick Wedding Date & Time</label>
+                        <input
+                          type="datetime-local"
+                          className="form-input"
+                          style={{ colorScheme: 'dark' }}
+                          value={toDateTimeLocalValue(cmsDb.siteSettings.weddingDate)}
+                          onChange={(e) => {
+                            const isoVal = e.target.value;
+                            const formatted = formatIsoToHumanDate(isoVal);
+                            setHasUnsavedChanges(true);
+                            setCmsDb({
+                              ...cmsDb,
+                              siteSettings: {
+                                ...cmsDb.siteSettings,
+                                weddingDate: isoVal,
+                                weddingDateDisplay: formatted || cmsDb.siteSettings.weddingDateDisplay
+                              }
+                            });
+                          }}
+                        />
+                      </div>
+                      <div className="form-group" style={{ marginBottom: '0.5rem' }}>
+                        <label className="form-label">Display Date Text</label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={cmsDb.siteSettings.weddingDateDisplay || ''}
+                          onChange={(e) => {
+                            setHasUnsavedChanges(true);
+                            setCmsDb({ ...cmsDb, siteSettings: { ...cmsDb.siteSettings, weddingDateDisplay: e.target.value } });
+                          }}
+                        />
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="grid-2" style={{ gap: '0.6rem' }}>
-                    <div className="form-group">
-                      <label className="form-label">Location Summary</label>
-                      <input
-                        type="text"
-                        className="form-input"
-                        value={cmsDb.siteSettings.locationSummary || ''}
-                        onChange={(e) => {
-                          setHasUnsavedChanges(true);
-                          setCmsDb({ ...cmsDb, siteSettings: { ...cmsDb.siteSettings, locationSummary: e.target.value } });
-                        }}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">RSVP Deadline</label>
-                      <input
-                        type="text"
-                        className="form-input"
-                        value={cmsDb.siteSettings.rsvpDeadline || ''}
-                        onChange={(e) => {
-                          setHasUnsavedChanges(true);
-                          setCmsDb({ ...cmsDb, siteSettings: { ...cmsDb.siteSettings, rsvpDeadline: e.target.value } });
-                        }}
-                      />
+                    <div className="grid-2" style={{ gap: '0.6rem' }}>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label">Location Summary</label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={cmsDb.siteSettings.locationSummary || ''}
+                          onChange={(e) => {
+                            setHasUnsavedChanges(true);
+                            setCmsDb({ ...cmsDb, siteSettings: { ...cmsDb.siteSettings, locationSummary: e.target.value } });
+                          }}
+                        />
+                      </div>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label">RSVP Deadline</label>
+                        <div style={{ display: 'flex', gap: '0.35rem' }}>
+                          <input
+                            type="text"
+                            className="form-input"
+                            value={cmsDb.siteSettings.rsvpDeadline || ''}
+                            onChange={(e) => {
+                              setHasUnsavedChanges(true);
+                              setCmsDb({ ...cmsDb, siteSettings: { ...cmsDb.siteSettings, rsvpDeadline: e.target.value } });
+                            }}
+                          />
+                          <input
+                            type="date"
+                            className="form-input"
+                            style={{ width: '44px', padding: '0.35rem', colorScheme: 'dark', cursor: 'pointer' }}
+                            title="Pick RSVP Deadline from Calendar"
+                            onChange={(e) => {
+                              const formatted = formatSimpleDateToHuman(e.target.value);
+                              if (formatted) {
+                                setHasUnsavedChanges(true);
+                                setCmsDb({ ...cmsDb, siteSettings: { ...cmsDb.siteSettings, rsvpDeadline: formatted } });
+                              }
+                            }}
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -2750,6 +2950,69 @@ export default function CmsPortal({
 
                   {selectedBlock.type === 'quote_countdown' && (
                     <>
+                      <div
+                        style={{
+                          background: 'var(--bg-secondary)',
+                          border: '1.5px solid var(--border-gold)',
+                          borderRadius: '12px',
+                          padding: '0.9rem',
+                          marginBottom: '1rem'
+                        }}
+                      >
+                        <div
+                          className="form-label"
+                          style={{
+                            color: 'var(--accent-secondary)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.4rem',
+                            marginBottom: '0.55rem'
+                          }}
+                        >
+                          <Calendar size={14} /> Set Wedding Date & Countdown Timer
+                        </div>
+                        <div className="form-group" style={{ marginBottom: '0.65rem' }}>
+                          <label className="form-label">Pick Wedding Date & Time (Calendar)</label>
+                          <input
+                            type="datetime-local"
+                            className="form-input"
+                            style={{ colorScheme: 'dark' }}
+                            value={toDateTimeLocalValue(cmsDb.siteSettings?.weddingDate)}
+                            onChange={(e) => {
+                              const isoVal = e.target.value;
+                              const formatted = formatIsoToHumanDate(isoVal);
+                              setHasUnsavedChanges(true);
+                              setCmsDb({
+                                ...cmsDb,
+                                siteSettings: {
+                                  ...cmsDb.siteSettings,
+                                  weddingDate: isoVal,
+                                  weddingDateDisplay: formatted || cmsDb.siteSettings.weddingDateDisplay
+                                }
+                              });
+                            }}
+                          />
+                        </div>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label className="form-label">Displayed Date Text (Auto-formats or type custom)</label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            value={cmsDb.siteSettings?.weddingDateDisplay || ''}
+                            onChange={(e) => {
+                              setHasUnsavedChanges(true);
+                              setCmsDb({
+                                ...cmsDb,
+                                siteSettings: {
+                                  ...cmsDb.siteSettings,
+                                  weddingDateDisplay: e.target.value
+                                }
+                              });
+                            }}
+                          />
+                        </div>
+                      </div>
+
                       <div className="form-group">
                         <label className="form-label">Top Note Label</label>
                         <input
