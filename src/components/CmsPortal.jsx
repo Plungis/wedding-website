@@ -1222,13 +1222,33 @@ export default function CmsPortal({
   isOpen,
   onClose,
   onContentUpdated,
-  onSimulateQrScan
+  onSimulateQrScan,
+  onSessionChange,
+  onAdminOverride,
+  isUnderConstruction
 }) {
   const [username, setUsername] = useState('admin');
   const [passcode, setPasscode] = useState('wedding2026');
   const [currentUser, setCurrentUser] = useState(null);
   const [authenticated, setAuthenticated] = useState(false);
   const [authError, setAuthError] = useState('');
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem('wedding_cms_session');
+      if (raw) {
+        const sess = JSON.parse(raw);
+        if (sess && sess.passcode && sess.user) {
+          setUsername(sess.username || sess.user.username || 'admin');
+          setPasscode(sess.passcode);
+          setCurrentUser(sess.user);
+          setAuthenticated(true);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   // Top-level studio mode: 'builder' | 'all-text' | 'themes' | 'guests' | 'print-qrs' | 'approvals' | 'users' | 'revisions'
   const [studioMode, setStudioMode] = useState('builder');
@@ -1391,8 +1411,17 @@ export default function CmsPortal({
       if (!res.ok) {
         setAuthError(data.error || 'Invalid credentials');
       } else {
+        const sessionData = {
+          username: username.trim(),
+          passcode: passcode.trim(),
+          user: data.user
+        };
+        try {
+          window.localStorage.setItem('wedding_cms_session', JSON.stringify(sessionData));
+        } catch {}
         setCurrentUser(data.user);
         setAuthenticated(true);
+        onSessionChange?.(data.user);
         const recovered = await maybeAutoRecoverFromLocalStorage(data.db);
         const activeData = recovered || data;
         setCmsDb(activeData.db);
@@ -1402,6 +1431,15 @@ export default function CmsPortal({
     } catch {
       setAuthError('Could not connect to CMS server.');
     }
+  }
+
+  function handleLogout() {
+    try {
+      window.localStorage.removeItem('wedding_cms_session');
+    } catch {}
+    setAuthenticated(false);
+    setCurrentUser(null);
+    onSessionChange?.(null);
   }
 
   async function fetchAdminData() {
@@ -2848,15 +2886,32 @@ export default function CmsPortal({
               </button>
             )}
 
+            {isUnderConstruction && onAdminOverride && (
+              <button
+                type="button"
+                className="btn-secondary"
+                style={{
+                  padding: '0.5rem 0.85rem',
+                  fontSize: '0.8rem',
+                  borderColor: 'var(--border-gold)',
+                  color: 'var(--accent-secondary)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem'
+                }}
+                onClick={onAdminOverride}
+                title="Exit CMS and preview the live website via Admin Override"
+              >
+                <Eye size={14} /> Admin Override (View Live Site)
+              </button>
+            )}
+
             <button
               type="button"
               className="btn-secondary"
               title="Log out of CMS Desk"
-              style={{ padding: '0.5rem 0.8rem', fontSize: '0.8rem' }}
-              onClick={() => {
-                setAuthenticated(false);
-                setCurrentUser(null);
-              }}
+              style={{ padding: '0.5rem 0.8rem', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+              onClick={handleLogout}
             >
               <LogOut size={14} /> Log Out
             </button>

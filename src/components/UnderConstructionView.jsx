@@ -7,7 +7,11 @@ import {
   Eye,
   QrCode,
   Hash,
-  Heart
+  Heart,
+  LogIn,
+  LogOut,
+  Crown,
+  Edit3
 } from 'lucide-react';
 import { GothicRoseArchOrnament, PositionedImage, RichText } from './PageBlockRenderer.jsx';
 import RsvpTab from './RsvpTab.jsx';
@@ -19,8 +23,11 @@ export default function UnderConstructionView({
   reception,
   sampleInvites,
   initialCode,
+  currentUser,
+  onLoginClick,
+  onLogout,
+  onAdminOverride,
   onOpenCms,
-  onPreviewFullSite,
   onRsvpSubmitted,
   onUnlockWeddingParty,
   previewOnly = false
@@ -93,7 +100,7 @@ export default function UnderConstructionView({
           </div>
 
           <div className="top-utility-actions" style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-            {onPreviewFullSite && (
+            {!currentUser ? (
               <button
                 type="button"
                 className="btn-secondary"
@@ -101,12 +108,83 @@ export default function UnderConstructionView({
                   padding: '0.36rem 0.85rem',
                   fontSize: '0.76rem',
                   borderColor: 'var(--border-gold)',
-                  color: 'var(--accent-secondary)'
+                  color: 'var(--text-primary)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem'
                 }}
-                onClick={onPreviewFullSite}
+                onClick={onLoginClick}
               >
-                <Eye size={13} /> Preview Full Site (Admin Bypass)
+                <LogIn size={13} /> Log In
               </button>
+            ) : (
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <span
+                  style={{
+                    fontSize: '0.74rem',
+                    padding: '0.22rem 0.65rem',
+                    borderRadius: '999px',
+                    background: currentUser.role === 'admin' ? 'rgba(212, 168, 83, 0.18)' : 'rgba(59, 130, 246, 0.18)',
+                    border: currentUser.role === 'admin' ? '1px solid var(--border-gold)' : '1px solid #3b82f6',
+                    color: currentUser.role === 'admin' ? 'var(--accent-secondary)' : '#93c5fd',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.3rem',
+                    fontWeight: 600
+                  }}
+                >
+                  {currentUser.role === 'admin' ? <Crown size={12} /> : <Edit3 size={12} />}
+                  {currentUser.displayName || currentUser.username} ({currentUser.role === 'admin' ? 'Admin' : 'Editor'})
+                </span>
+
+                <button
+                  type="button"
+                  className="btn-primary"
+                  style={{
+                    padding: '0.36rem 0.85rem',
+                    fontSize: '0.76rem',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem'
+                  }}
+                  onClick={onAdminOverride}
+                  title="Preview the full live website (Admin Override)"
+                >
+                  <Eye size={13} /> Admin Override (View Live Site)
+                </button>
+
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  style={{
+                    padding: '0.36rem 0.85rem',
+                    fontSize: '0.76rem',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem'
+                  }}
+                  onClick={onOpenCms}
+                >
+                  <Settings size={13} /> CMS Studio
+                </button>
+
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  style={{
+                    padding: '0.36rem 0.85rem',
+                    fontSize: '0.76rem',
+                    color: '#f87171',
+                    borderColor: '#ef4444',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem'
+                  }}
+                  onClick={onLogout}
+                >
+                  <LogOut size={13} /> Log Out
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -409,16 +487,9 @@ export default function UnderConstructionView({
             textAlign: 'center'
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', color: 'var(--accent-secondary)', fontSize: '0.82rem', marginBottom: '0.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', color: 'var(--accent-secondary)', fontSize: '0.82rem' }}>
             <Heart size={14} />
             <span>{siteSettings?.footerText || 'Forever & Always Beneath the October Moon'}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-            {onPreviewFullSite && (
-              <button type="button" className="btn-secondary" onClick={onPreviewFullSite} style={{ fontSize: '0.78rem', padding: '0.45rem 0.9rem' }}>
-                <Eye size={14} /> Preview Full Website (Admin)
-              </button>
-            )}
           </div>
         </footer>
       )}

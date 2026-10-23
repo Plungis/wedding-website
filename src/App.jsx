@@ -8,7 +8,11 @@ import {
   MapPin,
   Settings,
   Hash,
-  Crown
+  Crown,
+  LogIn,
+  LogOut,
+  Eye,
+  Edit3
 } from 'lucide-react';
 import AboutTab from './components/AboutTab.jsx';
 import CeremonyTab from './components/CeremonyTab.jsx';
@@ -88,6 +92,26 @@ export default function App() {
   const [cmsOpen, setCmsOpen] = useState(() => checkIsCmsDesk());
   const [unlockedWeddingPartyGuest, setUnlockedWeddingPartyGuest] = useState(null);
   const [adminBypassConstruction, setAdminBypassConstruction] = useState(false);
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const raw = window.localStorage.getItem('wedding_cms_session');
+      if (raw) {
+        const sess = JSON.parse(raw);
+        return sess?.user || null;
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  });
+
+  function handleLogout() {
+    try {
+      window.localStorage.removeItem('wedding_cms_session');
+    } catch {}
+    setCurrentUser(null);
+    setAdminBypassConstruction(false);
+  }
 
   const loadContent = useCallback(async () => {
     try {
@@ -175,7 +199,11 @@ export default function App() {
           reception={reception}
           sampleInvites={sampleInvites}
           initialCode={qrCodeFromUrl}
-          onPreviewFullSite={() => setAdminBypassConstruction(true)}
+          currentUser={currentUser}
+          onLoginClick={() => setCmsOpen(true)}
+          onAdminOverride={() => setAdminBypassConstruction(true)}
+          onOpenCms={() => setCmsOpen(true)}
+          onLogout={handleLogout}
           onRsvpSubmitted={loadContent}
           onUnlockWeddingParty={(guest) => setUnlockedWeddingPartyGuest(guest)}
         />
@@ -184,6 +212,12 @@ export default function App() {
           onClose={handleCloseCms}
           onContentUpdated={loadContent}
           onSimulateQrScan={handleSimulateQrScan}
+          onSessionChange={(user) => setCurrentUser(user)}
+          onAdminOverride={() => {
+            setAdminBypassConstruction(true);
+            setCmsOpen(false);
+          }}
+          isUnderConstruction={isUnderConstruction}
         />
       </>
     );
@@ -211,7 +245,7 @@ export default function App() {
         <div
           className="no-print"
           style={{
-            background: 'linear-gradient(90deg, #5e1123, #2b0912)',
+            background: 'linear-gradient(90deg, #4c0519, #1e050c)',
             borderBottom: '1.5px solid var(--border-gold)',
             padding: '0.55rem 1.25rem',
             display: 'flex',
@@ -219,28 +253,40 @@ export default function App() {
             alignItems: 'center',
             flexWrap: 'wrap',
             gap: '0.75rem',
-            fontSize: '0.82rem'
+            fontSize: '0.82rem',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.5)'
           }}
         >
-          <span style={{ color: '#fff', fontWeight: 600 }}>
-            🚧 <strong style={{ color: 'var(--accent-secondary)' }}>Under Construction Mode is ACTIVE for Visitors</strong> — You are currently previewing the full site in Admin Bypass mode.
-          </span>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ fontSize: '1.1rem' }}>⚡</span>
+            <span style={{ color: '#fff' }}>
+              <strong style={{ color: 'var(--accent-secondary)' }}>Admin Override Active:</strong> Viewing live site (public visitors see Under Construction page).
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <button
               type="button"
               className="btn-secondary"
-              style={{ padding: '0.28rem 0.75rem', fontSize: '0.75rem' }}
+              style={{ padding: '0.3rem 0.8rem', fontSize: '0.75rem', borderColor: 'var(--border-gold)' }}
               onClick={() => setAdminBypassConstruction(false)}
             >
-              View Under Construction Screen
+              Exit Override (View Construction Screen)
             </button>
             <button
               type="button"
               className="btn-primary"
-              style={{ padding: '0.28rem 0.75rem', fontSize: '0.75rem' }}
+              style={{ padding: '0.3rem 0.8rem', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
               onClick={() => setCmsOpen(true)}
             >
-              Edit in CMS Studio
+              <Settings size={13} /> Edit in CMS Studio
+            </button>
+            <button
+              type="button"
+              className="btn-secondary"
+              style={{ padding: '0.3rem 0.8rem', fontSize: '0.75rem', color: '#f87171', borderColor: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+              onClick={handleLogout}
+            >
+              <LogOut size={13} /> Log Out
             </button>
           </div>
         </div>
@@ -267,7 +313,7 @@ export default function App() {
           )}
         </div>
 
-        <div className="top-utility-actions" style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+        <div className="top-utility-actions" style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <button
             type="button"
             className="btn-secondary"
@@ -284,6 +330,95 @@ export default function App() {
               ? `${siteSettings?.weddingPartyBtnText || 'Wedding Party Portal'} (Unlocked ✓)`
               : siteSettings?.weddingPartyBtnText || 'Wedding Party Portal'}
           </button>
+
+          {!currentUser ? (
+            <button
+              type="button"
+              className="btn-secondary"
+              style={{
+                padding: '0.36rem 0.85rem',
+                fontSize: '0.76rem',
+                borderColor: 'var(--border-gold)',
+                color: 'var(--text-primary)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem'
+              }}
+              onClick={() => setCmsOpen(true)}
+            >
+              <LogIn size={13} /> Log In
+            </button>
+          ) : (
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <span
+                style={{
+                  fontSize: '0.74rem',
+                  padding: '0.2rem 0.55rem',
+                  borderRadius: '999px',
+                  background: currentUser.role === 'admin' ? 'rgba(212, 168, 83, 0.2)' : 'rgba(59, 130, 246, 0.2)',
+                  border: currentUser.role === 'admin' ? '1px solid var(--border-gold)' : '1px solid #3b82f6',
+                  color: currentUser.role === 'admin' ? 'var(--accent-secondary)' : '#93c5fd',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.25rem',
+                  fontWeight: 600
+                }}
+              >
+                {currentUser.role === 'admin' ? <Crown size={12} /> : <Edit3 size={12} />}
+                {currentUser.displayName || currentUser.username}
+              </span>
+
+              {isUnderConstruction && (
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  style={{
+                    padding: '0.36rem 0.85rem',
+                    fontSize: '0.76rem',
+                    borderColor: 'var(--border-gold)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem'
+                  }}
+                  onClick={() => setAdminBypassConstruction(!adminBypassConstruction)}
+                >
+                  <Eye size={13} /> {adminBypassConstruction ? 'Construction Screen' : 'Admin Override'}
+                </button>
+              )}
+
+              <button
+                type="button"
+                className="btn-primary"
+                style={{
+                  padding: '0.36rem 0.85rem',
+                  fontSize: '0.76rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem'
+                }}
+                onClick={() => setCmsOpen(true)}
+              >
+                <Settings size={13} /> CMS Studio
+              </button>
+
+              <button
+                type="button"
+                className="btn-secondary"
+                style={{
+                  padding: '0.36rem 0.85rem',
+                  fontSize: '0.76rem',
+                  color: '#f87171',
+                  borderColor: '#ef4444',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem'
+                }}
+                onClick={handleLogout}
+              >
+                <LogOut size={13} /> Log Out
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -446,12 +581,18 @@ export default function App() {
         </div>
       </footer>
 
-      {/* Robust Drag-and-Drop Back-End CMS Studio (Accessible via /cmsdesk) */}
+      {/* Robust Drag-and-Drop Back-End CMS Studio (Accessible via /cmsdesk or Log In) */}
       <CmsPortal
         isOpen={cmsOpen}
         onClose={handleCloseCms}
         onContentUpdated={loadContent}
         onSimulateQrScan={handleSimulateQrScan}
+        onSessionChange={(user) => setCurrentUser(user)}
+        onAdminOverride={() => {
+          setAdminBypassConstruction(true);
+          setCmsOpen(false);
+        }}
+        isUnderConstruction={isUnderConstruction}
       />
     </div>
   );
